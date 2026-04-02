@@ -545,7 +545,7 @@ echo "Dashboard settings saved to $DASHBOARD_SETTINGS"
 
 # 3. Run install-hooks.js — it modifies ~/.claude-internal/settings.json
 echo "Installing Claude Code hooks..."
-node "$INSTALLER_FILE" --handler "$HANDLER_FILE"${hookToken ? " --api-key " + hookToken : ""}
+node "$INSTALLER_FILE" --handler "$HANDLER_FILE"
 
 echo ""
 echo "Done! Claude Code hooks are configured to send events to ${dashboardUrl}"

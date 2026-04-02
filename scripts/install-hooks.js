@@ -20,23 +20,12 @@ const HOOK_TYPES = [...HOOKS_WITH_MATCHER, ...HOOKS_WITHOUT_MATCHER];
 
 /**
  * Build a hook entry for a given hook type.
+ * The command is minimal: just points to hook-handler.js.
+ * URL and token are read by hook-handler.js from claude-dashboard.json.
  * @param {string} hookType
- * @param {{ dashboardUrl?: string, apiKey?: string }} [opts]
  */
-function makeHookEntry(hookType, opts = {}) {
-  // Prefix env vars inline so they are baked into the hook command.
-  // Claude Code hook entries don't support a separate env block, but shell
-  // command prefixes (KEY=value node ...) work cross-platform via sh -c.
-  const envPrefix = [
-    opts.dashboardUrl ? `CLAUDE_DASHBOARD_URL=${opts.dashboardUrl}` : "",
-    opts.apiKey ? `CLAUDE_DASHBOARD_API_KEY=${opts.apiKey}` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const command = envPrefix
-    ? `${envPrefix} node "${HOOK_HANDLER}" ${hookType}`
-    : `node "${HOOK_HANDLER}" ${hookType}`;
+function makeHookEntry(hookType) {
+  const command = `node "${HOOK_HANDLER}" ${hookType}`;
 
   const entry = {
     hooks: [
@@ -64,9 +53,8 @@ function isOurEntry(entry) {
 /**
  * Install hook entries into ~/.claude-internal/settings.json.
  * @param {boolean} [silent]
- * @param {{ dashboardUrl?: string, apiKey?: string }} [opts]  Remote server config
  */
-function installHooks(silent = false, opts = {}) {
+function installHooks(silent = false) {
   let settings = {};
   if (fs.existsSync(SETTINGS_PATH)) {
     try {
@@ -87,7 +75,7 @@ function installHooks(silent = false, opts = {}) {
     if (!settings.hooks[hookType]) settings.hooks[hookType] = [];
 
     const existing = settings.hooks[hookType].findIndex(isOurEntry);
-    const entry = makeHookEntry(hookType, opts);
+    const entry = makeHookEntry(hookType);
 
     if (existing >= 0) {
       settings.hooks[hookType][existing] = entry;
@@ -113,17 +101,14 @@ function installHooks(silent = false, opts = {}) {
 }
 
 if (require.main === module) {
-  // Support CLI args: node install-hooks.js [--handler PATH] [--url URL] [--api-key KEY]
+  // Support CLI args: node install-hooks.js [--handler PATH]
   const args = process.argv.slice(2);
-  const opts = {};
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--handler" && args[i + 1]) {
       HOOK_HANDLER = args[++i].replace(/\\/g, "/");
     }
-    if (args[i] === "--url" && args[i + 1]) { opts.dashboardUrl = args[++i]; }
-    if (args[i] === "--api-key" && args[i + 1]) { opts.apiKey = args[++i]; }
   }
-  installHooks(false, opts);
+  installHooks(false);
 }
 
 module.exports = { installHooks };
