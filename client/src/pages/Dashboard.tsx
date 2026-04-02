@@ -12,6 +12,7 @@ import {
   GitBranch,
   ChevronDown,
   ChevronRight,
+  Hand,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { eventBus } from "../lib/eventBus";
@@ -34,16 +35,17 @@ export function Dashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [statsRes, workingRes, connectedRes, idleRes, eventsRes, costRes] = await Promise.all([
+      const [statsRes, workingRes, approvalRes, connectedRes, idleRes, eventsRes, costRes] = await Promise.all([
         api.stats.get(),
         api.agents.list({ status: "working", limit: 20 }),
+        api.agents.list({ status: "awaiting_approval", limit: 20 }),
         api.agents.list({ status: "connected", limit: 20 }),
         api.agents.list({ status: "idle", limit: 20 }),
         api.events.list({ limit: 15 }),
         api.pricing.totalCost(),
       ]);
       setStats(statsRes);
-      const active = [...workingRes.agents, ...connectedRes.agents, ...idleRes.agents];
+      const active = [...workingRes.agents, ...approvalRes.agents, ...connectedRes.agents, ...idleRes.agents];
       setActiveAgents(active);
       setRecentEvents(eventsRes.events);
       setTotalCost(costRes.total_cost);
@@ -106,6 +108,69 @@ export function Dashboard() {
         <button onClick={load} className="btn-primary mt-4">
           Retry
         </button>
+      </div>
+    );
+  }
+
+  function renderMainAgent(main: Agent) {
+    const children = allSubagents.filter((a) => a.parent_agent_id === main.id);
+    const isExpanded = expandedAgents.has(main.id);
+    const hasChildren = children.length > 0;
+    const activeCount = children.filter(
+      (c) => c.status === "working" || c.status === "connected"
+    ).length;
+
+    return (
+      <div key={main.id}>
+        <div className="flex items-center gap-1 min-w-0">
+          {hasChildren && (
+            <button
+              onClick={() =>
+                setExpandedAgents((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(main.id)) next.delete(main.id);
+                  else next.add(main.id);
+                  return next;
+                })
+              }
+              className="p-1 text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </button>
+          )}
+          <div className="flex-1 min-w-0">
+            <AgentCard agent={main} />
+          </div>
+        </div>
+
+        {hasChildren && isExpanded && (
+          <div className="ml-6 mt-1 space-y-1 border-l-2 border-violet-500/20 pl-3">
+            {children.map((sub) => (
+              <div key={sub.id} className="flex items-center gap-2">
+                <GitBranch className="w-3 h-3 text-violet-400 flex-shrink-0" />
+                <div className="flex-1">
+                  <AgentCard agent={sub} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {hasChildren && !isExpanded && (
+          <button
+            onClick={() => setExpandedAgents((prev) => new Set([...prev, main.id]))}
+            className="ml-7 mt-1 text-[11px] text-violet-400 hover:text-violet-300 transition-colors"
+          >
+            {children.length} subagent{children.length !== 1 ? "s" : ""}
+            {activeCount > 0 && (
+              <span className="text-emerald-400 ml-1">({activeCount} active)</span>
+            )}
+          </button>
+        )}
       </div>
     );
   }
@@ -197,71 +262,39 @@ export function Dashboard() {
             />
           ) : (
             <div className="space-y-2">
-              {activeAgents
-                .filter((a) => a.type === "main")
-                .slice(0, 5)
-                .map((main) => {
-                  const children = allSubagents.filter((a) => a.parent_agent_id === main.id);
-                  const isExpanded = expandedAgents.has(main.id);
-                  const hasChildren = children.length > 0;
-                  const activeCount = children.filter(
-                    (c) => c.status === "working" || c.status === "connected"
-                  ).length;
+              {/* Executing agents (working / connected) */}
+              {(() => {
+                const executing = activeAgents.filter(
+                  (a) => a.type === "main" && (a.status === "working" || a.status === "connected")
+                );
+                if (executing.length === 0) return null;
+                return (
+                  <>
+                    <p className="text-[11px] font-medium text-emerald-400/70 uppercase tracking-wider px-1">
+                      Executing
+                    </p>
+                    {executing.slice(0, 5).map((main) => renderMainAgent(main))}
+                  </>
+                );
+              })()}
 
-                  return (
-                    <div key={main.id}>
-                      <div className="flex items-center gap-1 min-w-0">
-                        {hasChildren && (
-                          <button
-                            onClick={() =>
-                              setExpandedAgents((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(main.id)) next.delete(main.id);
-                                else next.add(main.id);
-                                return next;
-                              })
-                            }
-                            className="p-1 text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
-                          </button>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <AgentCard agent={main} />
-                        </div>
-                      </div>
+              {/* Waiting for input agents (idle / awaiting_approval main) */}
+              {(() => {
+                const waiting = activeAgents.filter(
+                  (a) => a.type === "main" && (a.status === "idle" || a.status === "awaiting_approval")
+                );
+                if (waiting.length === 0) return null;
+                return (
+                  <>
+                    <p className="text-[11px] font-medium text-amber-400/70 uppercase tracking-wider px-1 mt-3 flex items-center gap-1">
+                      <Hand className="w-3 h-3" />
+                      Waiting for Input
+                    </p>
+                    {waiting.slice(0, 5).map((main) => renderMainAgent(main))}
+                  </>
+                );
+              })()}
 
-                      {hasChildren && isExpanded && (
-                        <div className="ml-6 mt-1 space-y-1 border-l-2 border-violet-500/20 pl-3">
-                          {children.map((sub) => (
-                            <div key={sub.id} className="flex items-center gap-2">
-                              <GitBranch className="w-3 h-3 text-violet-400 flex-shrink-0" />
-                              <div className="flex-1">
-                                <AgentCard agent={sub} />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {hasChildren && !isExpanded && (
-                        <button
-                          onClick={() => setExpandedAgents((prev) => new Set([...prev, main.id]))}
-                          className="ml-7 mt-1 text-[11px] text-violet-400 hover:text-violet-300 transition-colors"
-                        >
-                          {children.length} subagent{children.length !== 1 ? "s" : ""}
-                          {activeCount > 0 && (
-                            <span className="text-emerald-400 ml-1">({activeCount} active)</span>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
               {/* Show active subagents without a main agent in the active list */}
               {activeAgents
                 .filter((a) => a.type === "subagent")

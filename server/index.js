@@ -15,13 +15,32 @@ const analyticsRouter = require("./routes/analytics");
 const pricingRouter = require("./routes/pricing");
 const settingsRouter = require("./routes/settings");
 const workflowsRouter = require("./routes/workflows");
+const authRouter = require("./routes/auth");
+const { createAuthMiddleware } = require("./middleware/auth");
 
 function createApp() {
   const app = express();
 
+  // Trust the first proxy so req.ip reflects the real client IP when behind nginx/etc.
+  app.set("trust proxy", 1);
+
   app.use(cors());
   app.use(express.json({ limit: "1mb" }));
 
+  // Lightweight HTTP error logging
+  app.use((req, res, next) => {
+    res.on("finish", () => {
+      if (res.statusCode >= 400) {
+        console.log(`\x1b[31m${req.method} ${req.originalUrl} ${res.statusCode}\x1b[0m`);
+      }
+    });
+    next();
+  });
+
+  // Global auth gate (opt-in via DASHBOARD_ADMIN_PASSWORD)
+  app.use(createAuthMiddleware());
+
+  app.use("/api/auth", authRouter);
   app.use("/api/sessions", sessionsRouter);
   app.use("/api/agents", agentsRouter);
   app.use("/api/events", eventsRouter);
@@ -72,6 +91,39 @@ if (require.main === module) {
   // Auto-install Claude Code hooks on every startup so users don't have to
   try {
     const { installHooks } = require("../scripts/install-hooks");
+    const { ADMIN_PASSWORD } = require("./middleware/auth");
+    const { v4: uuidv4 } = require("uuid");
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+    const dbModule = require("./db");
+
+    if (ADMIN_PASSWORD) {
+      // Auth enabled — ensure a dedicated API token exists for hook ingestion.
+      // Persist to ~/.claude-internal/claude-dashboard.json so hook-handler.js
+      // can read it without embedding secrets in Claude Code settings.json.
+      const settingsPath = path.join(os.homedir(), ".claude-internal", "claude-dashboard.json");
+      let dashboardSettings = {};
+      try {
+        dashboardSettings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+      } catch { /* file doesn't exist yet */ }
+
+      const tokenName = "hook-ingestion";
+      const existing = dbModule.db
+        .prepare("SELECT token FROM api_tokens WHERE name = ?")
+        .get(tokenName);
+      const token = existing ? existing.token : uuidv4();
+      if (!existing) {
+        dbModule.stmts.insertToken.run(uuidv4(), tokenName, token);
+      }
+
+      dashboardSettings.hook_api_key = token;
+      const dir = path.dirname(settingsPath);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(settingsPath, JSON.stringify(dashboardSettings, null, 2) + "\n", "utf8");
+    }
+
+    // Always reinstall hooks (without apiKey — hook-handler reads from file)
     installHooks(true);
     console.log("Claude Code hooks auto-configured.");
   } catch {
@@ -136,6 +188,20 @@ if (require.main === module) {
         } catch {
           continue;
         }
+      }
+      // 3. Recover agents stuck in awaiting_approval for too long.
+      // Claude Code has no hook for permission denial/dismissal (ESC),
+      // so we use a timeout to reset these agents back to working.
+      const stuckAgents = cleanupDb.db
+        .prepare(
+          `SELECT a.id FROM agents a JOIN sessions s ON a.session_id = s.id
+           WHERE a.status = 'awaiting_approval' AND s.status = 'active'
+             AND a.updated_at < strftime('%Y-%m-%dT%H:%M:%fZ','now', '-5 minutes')`
+        )
+        .all();
+      for (const a of stuckAgents) {
+        cleanupDb.stmts.updateAgent.run(null, "working", null, null, null, null, a.id);
+        broadcast("agent_updated", cleanupDb.stmts.getAgent.get(a.id));
       }
     },
     2 * 60 * 1000

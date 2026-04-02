@@ -66,6 +66,8 @@ export function ActivityFeed() {
         return "working";
       case "PostToolUse":
         return "connected";
+      case "PermissionRequest":
+        return "awaiting_approval";
       case "Stop":
       case "SubagentStop":
       case "Compaction":

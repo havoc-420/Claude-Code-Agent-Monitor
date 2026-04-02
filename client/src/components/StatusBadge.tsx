@@ -8,7 +8,7 @@ interface AgentStatusBadgeProps {
 
 export function AgentStatusBadge({ status, pulse }: AgentStatusBadgeProps) {
   const config = STATUS_CONFIG[status];
-  const shouldPulse = pulse ?? (status === "working" || status === "connected");
+  const shouldPulse = pulse ?? (status === "working" || status === "connected" || status === "awaiting_approval");
 
   return (
     <span className={`badge ${config.bg} ${config.color}`}>

@@ -69,7 +69,7 @@ const processEvent = db.transaction((hookType, data) => {
     stmts.reactivateSession.run(sessionId);
     broadcast("session_updated", stmts.getSession.get(sessionId));
 
-    if (mainAgent && mainAgent.status !== "working" && mainAgent.status !== "connected") {
+    if (mainAgent && mainAgent.status !== "working" && mainAgent.status !== "connected" && mainAgent.status !== "awaiting_approval") {
       stmts.reactivateAgent.run(mainAgentId);
       mainAgent = stmts.getAgent.get(mainAgentId);
       broadcast("agent_updated", mainAgent);
@@ -134,10 +134,11 @@ const processEvent = db.transaction((hookType, data) => {
       // backgrounded — it does NOT mean the subagent finished its work.
       // Subagent completion is handled by SubagentStop, not here.
 
-      // Only clear current_tool on the main agent if it's actively working.
+      // Only clear current_tool on the main agent if it's actively working or awaiting approval.
+      // PostToolUse fires after user approves a permission request, so awaiting_approval → working.
       // Skip if idle (waiting for subagents) or already completed.
-      if (mainAgent && mainAgent.status === "working") {
-        stmts.updateAgent.run(null, null, null, null, null, null, mainAgentId);
+      if (mainAgent && (mainAgent.status === "working" || mainAgent.status === "awaiting_approval")) {
+        stmts.updateAgent.run(null, "working", null, null, null, null, mainAgentId);
         broadcast("agent_updated", stmts.getAgent.get(mainAgentId));
       }
       break;
@@ -293,6 +294,21 @@ const processEvent = db.transaction((hookType, data) => {
       break;
     }
 
+    case "PermissionRequest": {
+      summary = toolName ? `Awaiting approval: ${toolName}` : "Awaiting approval";
+
+      // Set main agent to awaiting_approval when a permission dialog is displayed.
+      // PostToolUse will transition it back to "working" after the user decides.
+      if (
+        mainAgent &&
+        (mainAgent.status === "working" || mainAgent.status === "connected")
+      ) {
+        stmts.updateAgent.run(null, "awaiting_approval", null, toolName, null, null, mainAgentId);
+        broadcast("agent_updated", stmts.getAgent.get(mainAgentId));
+      }
+      break;
+    }
+
     default: {
       summary = `Event: ${hookType}`;
     }
@@ -422,6 +438,129 @@ router.post("/event", (req, res) => {
   }
 
   res.json({ ok: true, event: result });
+});
+
+/**
+ * Serve the standalone hook-handler.js so remote clients can download it
+ * without needing a full clone of the project.
+ */
+router.get("/handler.js", (_req, res) => {
+  const handlerPath = require("path").resolve(__dirname, "../../scripts/hook-handler.js");
+  const fs = require("fs");
+  if (!fs.existsSync(handlerPath)) {
+    return res.status(404).json({ error: "hook-handler.js not found" });
+  }
+  res.setHeader("Content-Type", "application/javascript");
+  res.setHeader("Cache-Control", "no-cache");
+  fs.createReadStream(handlerPath).pipe(res);
+});
+
+/**
+ * Return setup info for remote Claude Code clients.
+ * Used by the one-liner: curl -s "$DASHBOARD/api/hooks/setup-info?token=YOUR_TOKEN" | sh
+ *
+ * Flow:
+ *   1. User creates a named API token in the Settings UI (e.g. "my-macbook")
+ *   2. User runs: curl -s "https://dashboard/api/hooks/setup-info?token=xxx" | sh
+ *   3. Server validates the token, then returns a shell script that downloads
+ *      hook-handler.js and configures hooks using that same token.
+ *
+ * If auth is disabled (no DASHBOARD_ADMIN_PASSWORD), no token is required and
+ * the script is generated without one.
+ */
+router.get("/setup-info", (req, res) => {
+  const { ADMIN_PASSWORD, DASHBOARD_API_KEY } = require("../middleware/auth");
+  const { stmts } = require("../db");
+  let hookToken = null;
+
+  if (ADMIN_PASSWORD) {
+    // Auth enabled — require a valid API token
+    const provided = req.headers["x-api-key"] || req.query.token;
+    if (!provided) {
+      return res.status(401).json({
+        error: "API key required. Create a token in Settings and pass ?token=YOUR_TOKEN.",
+      });
+    }
+    const tokenRow = stmts.getTokenByValue.get(provided);
+    if (!tokenRow && provided !== DASHBOARD_API_KEY) {
+      return res.status(401).json({ error: "Invalid API key." });
+    }
+    // Use the caller's own token — each machine gets its own named token
+    hookToken = provided;
+  }
+
+  // Derive the public-facing base URL from the request
+  const protocol = req.protocol;
+  const host = req.get("host");
+  const dashboardUrl = `${protocol}://${host}`;
+
+  const tokenJson = hookToken
+    ? `"${dashboardUrl}","hook_api_key":"${hookToken}"`
+    : `"${dashboardUrl}"`;
+
+  // Build the one-liner shell script
+  const script = `#!/bin/sh
+# Auto-generated setup script for Claude Code Agent Monitor
+# Dashboard: ${dashboardUrl}
+
+set -e
+
+HANDLER_DIR="$HOME/.claude-internal/agent-monitor"
+HANDLER_FILE="$HANDLER_DIR/hook-handler.js"
+SETTINGS_FILE="$HOME/.claude-internal/settings.json"
+DASHBOARD_SETTINGS="$HOME/.claude-internal/claude-dashboard.json"
+
+# 1. Download hook-handler.js
+mkdir -p "$HANDLER_DIR"
+echo "Downloading hook-handler.js from ${dashboardUrl}..."
+curl -sf "${dashboardUrl}/api/hooks/handler.js" -o "$HANDLER_FILE" || {
+  echo "ERROR: Failed to download hook-handler.js"
+  exit 1
+}
+chmod +x "$HANDLER_FILE"
+
+# 2. Write dashboard settings (URL + token)
+echo '{"dashboard_url":${tokenJson}}' > "$DASHBOARD_SETTINGS"
+echo "Dashboard settings saved to $DASHBOARD_SETTINGS"
+
+# 3. Install hooks into Claude Code settings
+node -e "
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const HOOK_HANDLER = path.join(os.homedir(), '.claude-internal', 'agent-monitor', 'hook-handler.js').replace(/\\\\\\\\/g, '/');
+const SETTINGS_PATH = path.join(os.homedir(), '.claude-internal', 'settings.json');
+const HOOK_TYPES = ['PreToolUse','PostToolUse','Stop','SubagentStop','Notification','PermissionRequest','SessionStart','SessionEnd'];
+const WITH_MATCHER = new Set(['PreToolUse','PostToolUse','Stop','SubagentStop','Notification','PermissionRequest']);
+
+let settings = {};
+try { settings = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8')); } catch {}
+if (!settings.hooks) settings.hooks = {};
+
+for (const t of HOOK_TYPES) {
+  if (!settings.hooks[t]) settings.hooks[t] = [];
+  const cmd = 'node \"' + HOOK_HANDLER + '\" ' + t;
+  const entry = { hooks: [{ type: 'command', command: cmd }] };
+  if (WITH_MATCHER.has(t)) entry.matcher = '*';
+  const idx = settings.hooks[t].findIndex(e => (e.command && e.command.includes('hook-handler.js')) || (Array.isArray(e.hooks) && e.hooks.some(h => h.command && h.command.includes('hook-handler.js'))));
+  if (idx >= 0) settings.hooks[t][idx] = entry;
+  else settings.hooks[t].push(entry);
+}
+
+fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
+fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + '\\\\n', 'utf8');
+console.log('Claude Code hooks installed. Hook handler: ' + HOOK_HANDLER);
+"
+
+echo ""
+echo "Done! Claude Code hooks are configured to send events to ${dashboardUrl}"
+echo "Start a new Claude Code session to begin tracking."
+`;
+
+  res.setHeader("Content-Type", "application/x-sh");
+  res.setHeader("Content-Disposition", "inline; filename=\"setup-agent-monitor.sh\"");
+  res.send(script);
 });
 
 router.transcriptCache = transcriptCache;

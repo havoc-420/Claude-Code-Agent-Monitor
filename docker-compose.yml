@@ -6,10 +6,16 @@ services:
       - "${DASHBOARD_PORT:-4820}:4820"
     volumes:
       - dashboard-data:/app/data
+      # Optional: mount local ~/.claude-internal for transcript token extraction.
+      # Required only when the dashboard runs on the SAME machine as Claude Code.
+      # Comment out or omit for remote/multi-machine deployments.
       - ${CLAUDE_HOME:-~/.claude-internal}:/root/.claude-internal:ro
     environment:
       - NODE_ENV=production
       - DASHBOARD_PORT=4820
+      # Optional: set to require X-API-Key authentication on the /api/hooks/event route.
+      # Recommended when the dashboard is exposed beyond localhost.
+      # - DASHBOARD_API_KEY=${DASHBOARD_API_KEY}
     restart: unless-stopped
 
 volumes:

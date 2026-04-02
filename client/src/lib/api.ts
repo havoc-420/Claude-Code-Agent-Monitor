@@ -128,4 +128,25 @@ export const api = {
     sessionCost: (sessionId: string) =>
       request<CostResult>(`/pricing/cost/${encodeURIComponent(sessionId)}`),
   },
+
+  auth: {
+    status: () => request<{ enabled: boolean; authenticated: boolean }>("/auth/status"),
+    login: (password: string) =>
+      request<{ ok: boolean }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      }),
+    logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
+    listTokens: () =>
+      request<Array<{ id: string; name: string; created_at: string; last_used_at: string | null }>>(
+        "/auth/tokens"
+      ),
+    createToken: (name: string) =>
+      request<{ id: string; name: string; token: string; created_at: string }>("/auth/tokens", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    deleteToken: (id: string) =>
+      request<{ ok: boolean }>(`/auth/tokens/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  },
 };

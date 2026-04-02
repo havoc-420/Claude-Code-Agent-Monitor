@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { STATUS_CONFIG } from "../lib/types";
 import type { Agent, AgentStatus } from "../lib/types";
 
-const COLUMNS: AgentStatus[] = ["idle", "connected", "working", "completed", "error"];
+const COLUMNS: AgentStatus[] = ["awaiting_approval", "idle", "working", "connected", "error", "completed"];
 const COLUMN_PAGE_SIZE = 10;
 
 export function KanbanBoard() {
@@ -101,7 +101,7 @@ export function KanbanBoard() {
               <div className="flex items-center gap-2 mb-4 px-1">
                 <span
                   className={`w-2 h-2 rounded-full ${config.dot} ${
-                    status === "working" ? "animate-pulse-dot" : ""
+                    status === "working" || status === "awaiting_approval" ? "animate-pulse-dot" : ""
                   }`}
                 />
                 <span className={`text-xs font-semibold uppercase tracking-wider ${config.color}`}>

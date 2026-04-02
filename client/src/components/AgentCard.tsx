@@ -11,7 +11,8 @@ interface AgentCardProps {
 
 export function AgentCard({ agent, onClick }: AgentCardProps) {
   const navigate = useNavigate();
-  const isActive = agent.status === "working" || agent.status === "connected";
+  const isWorking = agent.status === "working" || agent.status === "connected" || agent.status === "awaiting_approval";
+  const isWaiting = agent.status === "idle" && agent.type === "main";
 
   function handleClick() {
     if (onClick) {
@@ -25,7 +26,7 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
     <div
       onClick={handleClick}
       className={`card-hover p-4 cursor-pointer animate-fade-in overflow-hidden ${
-        isActive ? "border-l-2 border-l-emerald-500/50" : ""
+        isWorking ? "border-l-2 border-l-emerald-500/50" : isWaiting ? "border-l-2 border-l-amber-500/50" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-2 mb-3 min-w-0">
@@ -44,10 +45,16 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
             )}
           </div>
           <div className="min-w-0 overflow-hidden">
-            <p className="text-sm font-medium text-gray-200 truncate">{agent.name}</p>
-            {agent.subagent_type && (
+            <p className="text-sm font-medium text-gray-200 truncate">
+              {agent.session_cwd ? agent.session_cwd.split("/").pop() : agent.name}
+            </p>
+            {agent.session_cwd ? (
+              <p className="text-[11px] text-gray-500 truncate">
+                {agent.name}{agent.subagent_type ? ` · ${agent.subagent_type}` : ""}
+              </p>
+            ) : agent.subagent_type ? (
               <p className="text-[11px] text-gray-500 truncate">{agent.subagent_type}</p>
-            )}
+            ) : null}
           </div>
         </div>
         <AgentStatusBadge status={agent.status} />

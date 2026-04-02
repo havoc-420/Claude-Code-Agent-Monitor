@@ -1,5 +1,5 @@
 export type SessionStatus = "active" | "completed" | "error" | "abandoned";
-export type AgentStatus = "idle" | "connected" | "working" | "completed" | "error";
+export type AgentStatus = "idle" | "connected" | "working" | "awaiting_approval" | "completed" | "error";
 export type AgentType = "main" | "subagent";
 
 export interface Session {
@@ -19,6 +19,7 @@ export interface Session {
 export interface Agent {
   id: string;
   session_id: string;
+  session_cwd?: string | null;
   name: string;
   type: AgentType;
   subagent_type: string | null;
@@ -278,10 +279,10 @@ export const STATUS_CONFIG: Record<
   { label: string; color: string; bg: string; dot: string }
 > = {
   idle: {
-    label: "Idle",
-    color: "text-gray-400",
-    bg: "bg-gray-500/10 border-gray-500/20",
-    dot: "bg-gray-400",
+    label: "Waiting",
+    color: "text-amber-400",
+    bg: "bg-amber-500/10 border-amber-500/20",
+    dot: "bg-amber-400",
   },
   connected: {
     label: "Connected",
@@ -294,6 +295,12 @@ export const STATUS_CONFIG: Record<
     color: "text-emerald-400",
     bg: "bg-emerald-500/10 border-emerald-500/20",
     dot: "bg-emerald-400",
+  },
+  awaiting_approval: {
+    label: "Approval",
+    color: "text-orange-400",
+    bg: "bg-orange-500/10 border-orange-500/20",
+    dot: "bg-orange-400",
   },
   completed: {
     label: "Completed",

@@ -1145,6 +1145,80 @@ docker run -p 4820:4820 -v $(pwd)/data:/app/data agent-dashboard
 
 ---
 
+## Remote Client Setup
+
+When the dashboard is deployed on a remote server, local Claude Code instances can connect to it **without cloning the entire project**.
+
+### One-Liner Setup
+
+On the local machine, run:
+
+```bash
+# Without auth
+curl -s https://your-dashboard.com/api/hooks/setup-info | sh
+
+# With auth (use your API key)
+curl -s "https://your-dashboard.com/api/hooks/setup-info?token=YOUR_KEY" | sh
+```
+
+This single command:
+
+1. **Downloads `hook-handler.js`** to `~/.claude-internal/agent-monitor/hook-handler.js`
+2. **Writes dashboard URL + API token** to `~/.claude-internal/claude-dashboard.json`
+3. **Patches `~/.claude-internal/settings.json`** with hook entries pointing to the downloaded handler
+
+No project clone needed — `hook-handler.js` uses only Node.js built-ins (`fs`, `os`, `path`, `http`/`https`).
+
+### How It Works
+
+```
+~/.claude-internal/
+├── settings.json              # Claude Code config (hooks auto-added here)
+├── claude-dashboard.json      # { dashboard_url, hook_api_key }
+└── agent-monitor/
+    └── hook-handler.js        # Downloaded from remote server
+```
+
+**Configuration resolution order** (in `hook-handler.js`):
+
+| Setting | Priority |
+|---------|----------|
+| Dashboard URL | `CLAUDE_DASHBOARD_URL` env > `claude-dashboard.json` > `localhost:4820` |
+| API Key | `CLAUDE_DASHBOARD_API_KEY` env > `claude-dashboard.json` |
+
+### Manual Setup
+
+If you prefer manual setup:
+
+```bash
+# 1. Download hook-handler.js
+mkdir -p ~/.claude-internal/agent-monitor
+curl -s https://your-dashboard.com/api/hooks/handler.js -o ~/.claude-internal/agent-monitor/hook-handler.js
+
+# 2. Write config
+echo '{"dashboard_url":"https://your-dashboard.com","hook_api_key":"YOUR_TOKEN"}' > ~/.claude-internal/claude-dashboard.json
+
+# 3. Run the hook installer from the project (or edit settings.json manually)
+npm run install-hooks
+```
+
+### Uninstall
+
+```bash
+rm -rf ~/.claude-internal/agent-monitor
+rm -f ~/.claude-internal/claude-dashboard.json
+# Then remove hook entries from settings.json manually
+```
+
+### New Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/hooks/handler.js` | Download standalone `hook-handler.js` |
+| `GET` | `/api/hooks/setup-info` | Generate one-liner setup script (with token) |
+
+---
+
 ## Configuration
 
 ### Server Configuration (index.js)

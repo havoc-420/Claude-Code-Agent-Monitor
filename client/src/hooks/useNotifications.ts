@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { eventBus } from "../lib/eventBus";
 import type { WSMessage, Session, Agent, DashboardEvent } from "../lib/types";
 
@@ -10,6 +10,9 @@ interface NotifPrefs {
   onSessionError: boolean;
   onSessionComplete: boolean;
   onSubagentSpawn: boolean;
+  onWaitingForInput: boolean;
+  onPermissionRequest: boolean;
+  onNotification: boolean;
 }
 
 function loadPrefs(): NotifPrefs {
@@ -22,6 +25,9 @@ function loadPrefs(): NotifPrefs {
         onSessionError: true,
         onSessionComplete: false,
         onSubagentSpawn: false,
+        onWaitingForInput: true,
+        onPermissionRequest: true,
+        onNotification: true,
       };
     return {
       enabled: false,
@@ -29,6 +35,9 @@ function loadPrefs(): NotifPrefs {
       onSessionError: true,
       onSessionComplete: false,
       onSubagentSpawn: false,
+      onWaitingForInput: true,
+      onPermissionRequest: true,
+      onNotification: true,
       ...JSON.parse(raw),
     };
   } catch {
@@ -38,6 +47,9 @@ function loadPrefs(): NotifPrefs {
       onSessionError: true,
       onSessionComplete: false,
       onSubagentSpawn: false,
+      onWaitingForInput: true,
+      onPermissionRequest: true,
+      onNotification: true,
     };
   }
 }
@@ -56,6 +68,9 @@ function notify(title: string, body: string) {
  * Call once at the app root level.
  */
 export function useNotifications() {
+  // Track previous agent statuses to detect transitions to idle
+  const prevAgentStatus = useRef<Map<string, string>>(new Map());
+
   useEffect(() => {
     return eventBus.subscribe((msg: WSMessage) => {
       const prefs = loadPrefs();
@@ -83,13 +98,40 @@ export function useNotifications() {
           }
           break;
         }
+        case "agent_updated": {
+          const a = msg.data as Agent;
+
+          // Detect main agent transitioning to awaiting_approval (PermissionRequest)
+          if (prefs.onPermissionRequest && a.type === "main" && a.status === "awaiting_approval") {
+            const prev = prevAgentStatus.current.get(a.id);
+            if (prev && prev !== "awaiting_approval") {
+              const toolName = a.current_tool || "a tool";
+              notify("Approval Required", `${a.name.replace(/^Main Agent — /, "")} is waiting for permission to use ${toolName}`);
+            }
+          }
+
+          // Detect main agent transitioning to idle (Stop event = waiting for user input)
+          if (!prefs.onWaitingForInput) {
+            prevAgentStatus.current.set(a.id, a.status);
+            break;
+          }
+          if (a.type === "main" && a.status === "idle") {
+            const prev = prevAgentStatus.current.get(a.id);
+            // Only notify on actual transition (not on initial load / re-subscription)
+            if (prev && prev !== "idle") {
+              notify("Waiting for Input", a.name.replace(/^Main Agent — /, "") + " is ready for input");
+            }
+          }
+          prevAgentStatus.current.set(a.id, a.status);
+          break;
+        }
         case "new_event": {
           const ev = msg.data as DashboardEvent;
           if (ev.event_type === "Stop" && prefs.onSessionComplete) {
             notify("Claude Finished Responding", ev.summary || "Ready for input");
           } else if (ev.event_type === "SessionEnd" && prefs.onSessionComplete) {
             notify("Session Completed", ev.summary || "Session closed");
-          } else if (ev.event_type === "Notification") {
+          } else if (ev.event_type === "Notification" && prefs.onNotification) {
             notify("Claude Code", ev.summary || "Notification");
           }
           break;
@@ -98,3 +140,5 @@ export function useNotifications() {
     });
   }, []);
 }
+
+export type { NotifPrefs };

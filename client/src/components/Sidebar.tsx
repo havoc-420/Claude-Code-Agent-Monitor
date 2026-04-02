@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Columns3,
@@ -13,7 +13,10 @@ import {
   Globe,
   PanelLeftClose,
   PanelLeftOpen,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
+import { api } from "../lib/api";
 
 const NAV_ITEMS = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -42,6 +45,18 @@ interface SidebarProps {
 }
 
 export function Sidebar({ wsConnected, collapsed, onToggle }: SidebarProps) {
+  const navigate = useNavigate();
+  const { authEnabled } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await api.auth.logout();
+    } catch {
+      // Ignore errors
+    }
+    navigate("/login", { replace: true });
+  };
+
   return (
     <aside
       className={`fixed left-0 top-0 bottom-0 bg-surface-1 border-r border-border flex flex-col z-30 overflow-y-auto overflow-x-hidden transition-[width] duration-200 ${
@@ -89,6 +104,22 @@ export function Sidebar({ wsConnected, collapsed, onToggle }: SidebarProps) {
 
       {/* Collapse toggle */}
       <div className="px-2 py-2">
+        {authEnabled && (
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors mb-1"
+            title="Sign out"
+          >
+            {collapsed ? (
+              <LogOut className="w-4 h-4 flex-shrink-0 mx-auto" />
+            ) : (
+              <>
+                <LogOut className="w-4 h-4 flex-shrink-0" />
+                <span>Sign out</span>
+              </>
+            )}
+          </button>
+        )}
         <button
           onClick={onToggle}
           className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-gray-300 hover:bg-surface-3 transition-colors"

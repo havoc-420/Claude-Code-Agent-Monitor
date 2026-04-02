@@ -13,16 +13,35 @@ const SETTINGS_PATH = path.join(os.homedir(), ".claude-internal", "settings.json
 const HOOK_HANDLER = path.resolve(__dirname, "hook-handler.js").replace(/\\/g, "/");
 
 // Hook types to install. Some support matchers, some don't.
-const HOOKS_WITH_MATCHER = ["PreToolUse", "PostToolUse", "Stop", "SubagentStop", "Notification"];
+const HOOKS_WITH_MATCHER = ["PreToolUse", "PostToolUse", "Stop", "SubagentStop", "Notification", "PermissionRequest"];
 const HOOKS_WITHOUT_MATCHER = ["SessionStart", "SessionEnd"];
 const HOOK_TYPES = [...HOOKS_WITH_MATCHER, ...HOOKS_WITHOUT_MATCHER];
 
-function makeHookEntry(hookType) {
+/**
+ * Build a hook entry for a given hook type.
+ * @param {string} hookType
+ * @param {{ dashboardUrl?: string, apiKey?: string }} [opts]
+ */
+function makeHookEntry(hookType, opts = {}) {
+  // Prefix env vars inline so they are baked into the hook command.
+  // Claude Code hook entries don't support a separate env block, but shell
+  // command prefixes (KEY=value node ...) work cross-platform via sh -c.
+  const envPrefix = [
+    opts.dashboardUrl ? `CLAUDE_DASHBOARD_URL=${opts.dashboardUrl}` : "",
+    opts.apiKey ? `CLAUDE_DASHBOARD_API_KEY=${opts.apiKey}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const command = envPrefix
+    ? `${envPrefix} node "${HOOK_HANDLER}" ${hookType}`
+    : `node "${HOOK_HANDLER}" ${hookType}`;
+
   const entry = {
     hooks: [
       {
         type: "command",
-        command: `node "${HOOK_HANDLER}" ${hookType}`,
+        command,
       },
     ],
   };
@@ -41,7 +60,12 @@ function isOurEntry(entry) {
   return false;
 }
 
-function installHooks(silent = false) {
+/**
+ * Install hook entries into ~/.claude-internal/settings.json.
+ * @param {boolean} [silent]
+ * @param {{ dashboardUrl?: string, apiKey?: string }} [opts]  Remote server config
+ */
+function installHooks(silent = false, opts = {}) {
   let settings = {};
   if (fs.existsSync(SETTINGS_PATH)) {
     try {
@@ -62,7 +86,7 @@ function installHooks(silent = false) {
     if (!settings.hooks[hookType]) settings.hooks[hookType] = [];
 
     const existing = settings.hooks[hookType].findIndex(isOurEntry);
-    const entry = makeHookEntry(hookType);
+    const entry = makeHookEntry(hookType, opts);
 
     if (existing >= 0) {
       settings.hooks[hookType][existing] = entry;

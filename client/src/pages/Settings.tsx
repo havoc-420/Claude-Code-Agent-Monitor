@@ -37,6 +37,10 @@ import {
   Coins,
   BarChart3,
   Settings as SettingsIcon,
+  Hand,
+  MessageSquare,
+  Key,
+  Copy,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { eventBus } from "../lib/eventBus";
@@ -54,6 +58,9 @@ interface NotifPrefs {
   onSessionError: boolean;
   onSessionComplete: boolean;
   onSubagentSpawn: boolean;
+  onWaitingForInput: boolean;
+  onPermissionRequest: boolean;
+  onNotification: boolean;
 }
 
 const defaultNotif: NotifPrefs = {
@@ -62,6 +69,9 @@ const defaultNotif: NotifPrefs = {
   onSessionError: true,
   onSessionComplete: false,
   onSubagentSpawn: false,
+  onWaitingForInput: true,
+  onPermissionRequest: true,
+  onNotification: true,
 };
 
 function loadNotifPrefs(): NotifPrefs {
@@ -189,6 +199,26 @@ export function Settings() {
   const [abandonHours, setAbandonHours] = useState("24");
   const [purgeDays, setPurgeDays] = useState("90");
 
+  // ─── Token management state ───
+  interface ApiToken {
+    id: string;
+    name: string;
+    created_at: string;
+    last_used_at: string | null;
+  }
+  const [tokens, setTokens] = useState<ApiToken[]>([]);
+  const [tokensLoading, setTokensLoading] = useState(false);
+  const [newTokenName, setNewTokenName] = useState("");
+  const [creatingToken, setCreatingToken] = useState(false);
+  const [newlyCreatedToken, setNewlyCreatedToken] = useState<{
+    id: string;
+    name: string;
+    token: string;
+  } | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
+  const [revokingTokenId, setRevokingTokenId] = useState<string | null>(null);
+  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       const [pricingRes, costRes, infoRes] = await Promise.all([
@@ -244,6 +274,62 @@ export function Settings() {
     const t = setTimeout(() => setActionResult(null), 5000);
     return () => clearTimeout(t);
   }, [actionResult]);
+
+  // ─── Token management callbacks ───
+  const loadTokens = useCallback(async () => {
+    setTokensLoading(true);
+    try {
+      const list = await api.auth.listTokens();
+      setTokens(list);
+    } catch {
+      // Auth disabled or not authenticated — silently skip
+    } finally {
+      setTokensLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTokens();
+  }, [loadTokens]);
+
+  const handleCreateToken = async () => {
+    if (!newTokenName.trim()) return;
+    setCreatingToken(true);
+    try {
+      const result = await api.auth.createToken(newTokenName.trim());
+      setNewlyCreatedToken({ id: result.id, name: result.name, token: result.token });
+      setNewTokenName("");
+      await loadTokens();
+    } catch {
+      // Silently ignore
+    } finally {
+      setCreatingToken(false);
+    }
+  };
+
+  const handleCopyToken = async () => {
+    if (!newlyCreatedToken) return;
+    try {
+      await navigator.clipboard.writeText(newlyCreatedToken.token);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+    } catch {
+      // Clipboard not available
+    }
+  };
+
+  const handleRevokeToken = async (id: string) => {
+    setRevokingTokenId(id);
+    try {
+      await api.auth.deleteToken(id);
+      setConfirmRevokeId(null);
+      await loadTokens();
+    } catch {
+      // Silently ignore
+    } finally {
+      setRevokingTokenId(null);
+    }
+  };
 
   const updateNotifPrefs = (patch: Partial<NotifPrefs>) => {
     setNotifPrefs((prev) => {
@@ -850,6 +936,32 @@ export function Settings() {
                     label="Subagent spawned"
                   />
                 </div>
+                <div className="flex items-center gap-3 bg-surface-2 rounded-lg px-3.5 py-3">
+                  <Hand className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <Toggle
+                    checked={notifPrefs.onWaitingForInput}
+                    onChange={(v) => updateNotifPrefs({ onWaitingForInput: v })}
+                    label="Waiting for input"
+                    description="Claude finished, needs your response"
+                  />
+                </div>
+                <div className="flex items-center gap-3 bg-surface-2 rounded-lg px-3.5 py-3">
+                  <ShieldAlert className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                  <Toggle
+                    checked={notifPrefs.onPermissionRequest}
+                    onChange={(v) => updateNotifPrefs({ onPermissionRequest: v })}
+                    label="Permission request"
+                    description="Claude needs approval to use a tool"
+                  />
+                </div>
+                <div className="flex items-center gap-3 bg-surface-2 rounded-lg px-3.5 py-3">
+                  <MessageSquare className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                  <Toggle
+                    checked={notifPrefs.onNotification}
+                    onChange={(v) => updateNotifPrefs({ onNotification: v })}
+                    label="Claude notification"
+                  />
+                </div>
               </div>
 
               {/* Test notification */}
@@ -1078,6 +1190,128 @@ export function Settings() {
 
             {actionBanner(["clear"])}
           </div>
+        </div>
+      </section>
+
+      {/* ─── API TOKENS ─── */}
+      <section>
+        <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
+          <Key className="w-4 h-4 text-gray-500" />
+          API Tokens
+        </h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Named tokens for hook-handler and API callers. Only shown once at creation.
+          Requires <code className="font-mono bg-surface-4 px-1 rounded">DASHBOARD_ADMIN_PASSWORD</code> to be set.
+        </p>
+
+        <div className="card p-5 space-y-4">
+          {/* New token form */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newTokenName}
+              onChange={(e) => setNewTokenName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleCreateToken(); }}
+              placeholder="Token name (e.g. CI server)"
+              className="input flex-1 text-sm"
+              disabled={creatingToken}
+            />
+            <button
+              onClick={handleCreateToken}
+              disabled={creatingToken || !newTokenName.trim()}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {creatingToken ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
+              Generate
+            </button>
+          </div>
+
+          {/* Newly created token reveal */}
+          {newlyCreatedToken && (
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 space-y-2">
+              <p className="text-xs text-emerald-400 font-medium">
+                Token created: <span className="text-gray-200">{newlyCreatedToken.name}</span> — copy it now, it will not be shown again.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs font-mono bg-surface-1 border border-border rounded px-3 py-2 text-gray-200 break-all">
+                  {newlyCreatedToken.token}
+                </code>
+                <button
+                  onClick={handleCopyToken}
+                  className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-2 rounded-md bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors"
+                >
+                  {tokenCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {tokenCopied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  onClick={() => setNewlyCreatedToken(null)}
+                  className="flex-shrink-0 text-gray-500 hover:text-gray-300 transition-colors p-1"
+                  title="Dismiss"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Token list */}
+          {tokensLoading ? (
+            <p className="text-xs text-gray-500">Loading tokens…</p>
+          ) : tokens.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              No tokens yet. Generate one above, or auth may be disabled.
+            </p>
+          ) : (
+            <div className="divide-y divide-border">
+              {tokens.map((tok) => (
+                <div key={tok.id} className="flex items-center justify-between py-3 gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-200 truncate">{tok.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Created {formatTimestamp(tok.created_at)}
+                      {tok.last_used_at && (
+                        <span> · Last used {formatTimestamp(tok.last_used_at)}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {confirmRevokeId === tok.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleRevokeToken(tok.id)}
+                          disabled={revokingTokenId === tok.id}
+                          className="text-xs px-2.5 py-1 rounded-md bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                        >
+                          {revokingTokenId === tok.id ? (
+                            <RefreshCw className="w-3 h-3 animate-spin inline" />
+                          ) : (
+                            "Revoke"
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setConfirmRevokeId(null)}
+                          className="text-xs px-2 py-1 rounded-md text-gray-400 hover:bg-surface-4 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmRevokeId(tok.id)}
+                        className="text-xs px-2.5 py-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

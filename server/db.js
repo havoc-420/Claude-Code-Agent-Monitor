@@ -54,7 +54,7 @@ db.exec(`
     name TEXT NOT NULL,
     type TEXT NOT NULL DEFAULT 'main' CHECK(type IN ('main','subagent')),
     subagent_type TEXT,
-    status TEXT NOT NULL DEFAULT 'idle' CHECK(status IN ('idle','connected','working','completed','error')),
+    status TEXT NOT NULL DEFAULT 'idle' CHECK(status IN ('idle','connected','working','awaiting_approval','completed','error')),
     task TEXT,
     current_tool TEXT,
     started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -97,6 +97,20 @@ db.exec(`
     cache_read_per_mtok REAL NOT NULL DEFAULT 0,
     cache_write_per_mtok REAL NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS ip_whitelist (
+    ip         TEXT PRIMARY KEY,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS api_tokens (
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    token        TEXT UNIQUE NOT NULL,
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    last_used_at TEXT
   );
 
   CREATE INDEX IF NOT EXISTS idx_agents_session ON agents(session_id);
@@ -203,6 +217,58 @@ try {
   ).run();
 }
 
+// Migrate: add 'awaiting_approval' to agents status CHECK constraint.
+// SQLite does not support ALTER CONSTRAINT, so we must recreate the table.
+// CHECK constraints only fire on INSERT/UPDATE — SELECT never triggers them,
+// so we probe by checking the raw SQL schema for the constraint string.
+const agentsTableSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='agents'").get() || {}).sql || "";
+const agentsOldExists = !!(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agents_old'").get());
+
+if (agentsOldExists || !agentsTableSql.includes("awaiting_approval")) {
+  db.pragma("foreign_keys = OFF");
+
+  // If agents_old exists from a previous failed migration, just drop it and
+  // let the fresh CREATE TABLE below build a clean agents table.
+  if (agentsOldExists && !agentsTableSql) {
+    db.prepare("DROP TABLE agents_old").run();
+  } else {
+    // Normal migration path: rename → create → copy → drop
+    db.prepare("ALTER TABLE agents RENAME TO agents_old").run();
+  }
+
+  db.prepare(`
+    CREATE TABLE agents (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'main' CHECK(type IN ('main','subagent')),
+      subagent_type TEXT,
+      status TEXT NOT NULL DEFAULT 'idle' CHECK(status IN ('idle','connected','working','awaiting_approval','completed','error')),
+      task TEXT,
+      current_tool TEXT,
+      started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      ended_at TEXT,
+      parent_agent_id TEXT,
+      metadata TEXT,
+      updated_at TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (parent_agent_id) REFERENCES agents(id) ON DELETE SET NULL
+    )
+  `).run();
+
+  // Only copy data if agents_old still has rows (normal migration path)
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agents_old'").get()) {
+    db.prepare(`
+      INSERT INTO agents (id, session_id, name, type, subagent_type, status, task, current_tool, started_at, ended_at, parent_agent_id, metadata, updated_at)
+        SELECT id, session_id, name, type, subagent_type, status, task, current_tool, started_at, ended_at, parent_agent_id, metadata, updated_at
+        FROM agents_old
+    `).run();
+    db.prepare("DROP TABLE agents_old").run();
+  }
+
+  db.pragma("foreign_keys = ON");
+}
+
 // Startup cleanup: mark stale active sessions as completed.
 // Legacy sessions (created before SessionEnd hook) will never receive a SessionEnd event,
 // so they stay "active" forever. Complete any active session whose last event is older than
@@ -228,7 +294,7 @@ db.prepare(
   UPDATE agents SET
     status = 'completed',
     ended_at = COALESCE(ended_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-  WHERE status IN ('working', 'connected', 'idle')
+  WHERE status IN ('working', 'connected', 'idle', 'awaiting_approval')
     AND session_id IN (SELECT id FROM sessions WHERE status IN ('completed', 'error', 'abandoned'))
 `
 ).run();
@@ -255,14 +321,26 @@ const stmts = {
     "UPDATE sessions SET status = 'active', ended_at = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
   ),
 
-  getAgent: db.prepare("SELECT * FROM agents WHERE id = ?"),
-  listAgents: db.prepare("SELECT * FROM agents ORDER BY started_at DESC LIMIT ? OFFSET ?"),
-  listAgentsBySession: db.prepare(
-    "SELECT * FROM agents WHERE session_id = ? ORDER BY started_at ASC"
-  ),
-  listAgentsByStatus: db.prepare(
-    "SELECT * FROM agents WHERE status = ? ORDER BY started_at DESC LIMIT ? OFFSET ?"
-  ),
+  getAgent: db.prepare(`
+    SELECT a.*, s.cwd as session_cwd
+    FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
+    WHERE a.id = ?
+  `),
+  listAgents: db.prepare(`
+    SELECT a.*, s.cwd as session_cwd
+    FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
+    ORDER BY a.started_at DESC LIMIT ? OFFSET ?
+  `),
+  listAgentsBySession: db.prepare(`
+    SELECT a.*, s.cwd as session_cwd
+    FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
+    WHERE a.session_id = ? ORDER BY a.started_at ASC
+  `),
+  listAgentsByStatus: db.prepare(`
+    SELECT a.*, s.cwd as session_cwd
+    FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
+    WHERE a.status = ? ORDER BY a.started_at DESC LIMIT ? OFFSET ?
+  `),
   insertAgent: db.prepare(
     "INSERT INTO agents (id, session_id, name, type, subagent_type, status, task, started_at, updated_at, parent_agent_id, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?)"
   ),
@@ -408,6 +486,31 @@ const stmts = {
     SELECT ROUND(CAST(COUNT(*) AS REAL) / MAX(1, (SELECT COUNT(*) FROM sessions)), 1) as avg
     FROM events
   `),
+
+  // IP whitelist (auth sessions)
+  insertOrReplaceIP: db.prepare(
+    "INSERT OR REPLACE INTO ip_whitelist (ip, expires_at) VALUES (?, ?)"
+  ),
+  getIP: db.prepare(
+    "SELECT * FROM ip_whitelist WHERE ip = ? AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now')"
+  ),
+  deleteIP: db.prepare("DELETE FROM ip_whitelist WHERE ip = ?"),
+  deleteExpiredIPs: db.prepare(
+    "DELETE FROM ip_whitelist WHERE expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now')"
+  ),
+
+  // API tokens
+  listTokens: db.prepare(
+    "SELECT id, name, created_at, last_used_at FROM api_tokens ORDER BY created_at DESC"
+  ),
+  getTokenByValue: db.prepare("SELECT * FROM api_tokens WHERE token = ?"),
+  insertToken: db.prepare(
+    "INSERT INTO api_tokens (id, name, token) VALUES (?, ?, ?)"
+  ),
+  deleteToken: db.prepare("DELETE FROM api_tokens WHERE id = ?"),
+  touchTokenLastUsed: db.prepare(
+    "UPDATE api_tokens SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE token = ?"
+  ),
 };
 
 module.exports = { db, stmts, DB_PATH };

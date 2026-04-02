@@ -28,6 +28,11 @@ describe("AgentStatusBadge", () => {
     expect(screen.getByText("Error")).toBeInTheDocument();
   });
 
+  it("should render awaiting_approval status", () => {
+    render(<AgentStatusBadge status="awaiting_approval" />);
+    expect(screen.getByText("Approval")).toBeInTheDocument();
+  });
+
   it("should apply pulse animation for working status by default", () => {
     const { container } = render(<AgentStatusBadge status="working" />);
     const dot = container.querySelector(".animate-pulse-dot");
