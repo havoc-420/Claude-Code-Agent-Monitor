@@ -216,6 +216,7 @@ export function Settings() {
     token: string;
   } | null>(null);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [setupCmdCopied, setSetupCmdCopied] = useState(false);
   const [revokingTokenId, setRevokingTokenId] = useState<string | null>(null);
   const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
 
@@ -313,6 +314,19 @@ export function Settings() {
       await navigator.clipboard.writeText(newlyCreatedToken.token);
       setTokenCopied(true);
       setTimeout(() => setTokenCopied(false), 2000);
+    } catch {
+      // Clipboard not available
+    }
+  };
+
+  const handleCopySetupCmd = async () => {
+    if (!newlyCreatedToken) return;
+    const baseUrl = window.location.origin;
+    const cmd = `curl -s "${baseUrl}/api/hooks/setup-info?token=${newlyCreatedToken.token}" | sh`;
+    try {
+      await navigator.clipboard.writeText(cmd);
+      setSetupCmdCopied(true);
+      setTimeout(() => setSetupCmdCopied(false), 2000);
     } catch {
       // Clipboard not available
     }
@@ -1232,7 +1246,7 @@ export function Settings() {
 
           {/* Newly created token reveal */}
           {newlyCreatedToken && (
-            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 space-y-2">
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 space-y-3">
               <p className="text-xs text-emerald-400 font-medium">
                 Token created: <span className="text-gray-200">{newlyCreatedToken.name}</span> — copy it now, it will not be shown again.
               </p>
@@ -1254,6 +1268,23 @@ export function Settings() {
                 >
                   <X className="w-4 h-4" />
                 </button>
+              </div>
+
+              {/* One-liner setup command */}
+              <div>
+                <p className="text-xs text-gray-400 mb-1.5">Run on target machine to connect Claude Code:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs font-mono bg-surface-1 border border-border rounded px-3 py-2 text-blue-300 break-all select-all">
+                    curl -s &quot;{window.location.origin}/api/hooks/setup-info?token={newlyCreatedToken.token}&quot; | sh
+                  </code>
+                  <button
+                    onClick={handleCopySetupCmd}
+                    className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-2 rounded-md bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors"
+                  >
+                    {setupCmdCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {setupCmdCopied ? "Copied" : "Copy"}
+                  </button>
+                </div>
               </div>
             </div>
           )}

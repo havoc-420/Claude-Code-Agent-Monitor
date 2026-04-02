@@ -489,10 +489,10 @@ router.get("/setup-info", (req, res) => {
     hookToken = provided;
   }
 
-  // Derive the public-facing base URL from the request
-  const protocol = req.protocol;
-  const host = req.get("host");
-  const dashboardUrl = `${protocol}://${host}`;
+  // Derive the public-facing base URL.
+  // Priority: DASHBOARD_PUBLIC_URL env > request headers (for reverse-proxy setups)
+  const dashboardUrl = process.env.DASHBOARD_PUBLIC_URL
+    || `${req.protocol}://${req.get("host")}`;
 
   const tokenJson = hookToken
     ? `"${dashboardUrl}","hook_api_key":"${hookToken}"`

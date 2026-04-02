@@ -1169,6 +1169,16 @@ This single command:
 
 No project clone needed — `hook-handler.js` uses only Node.js built-ins (`fs`, `os`, `path`, `http`/`https`).
 
+### Reverse Proxy / Custom Domain
+
+When deploying behind a reverse proxy (Nginx, Caddy, etc.) or using a custom domain, set the `DASHBOARD_PUBLIC_URL` environment variable so the generated setup script references the correct public URL:
+
+```bash
+DASHBOARD_PUBLIC_URL=https://monitor.example.com npm start
+```
+
+Without this, the server infers the URL from the incoming request headers (`protocol` + `host`), which may be incorrect behind a proxy.
+
 ### How It Works
 
 ```
