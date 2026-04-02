@@ -18,6 +18,8 @@ const workflowsRouter = require("./routes/workflows");
 const authRouter = require("./routes/auth");
 const { createAuthMiddleware } = require("./middleware/auth");
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
 function createApp() {
   const app = express();
 
@@ -36,6 +38,13 @@ function createApp() {
     });
     next();
   });
+
+  // Serve static frontend files BEFORE auth so the SPA login page can load.
+  // API routes remain protected by the auth middleware below.
+  const clientDist = path.join(__dirname, "..", "client", "dist");
+  if (IS_PRODUCTION) {
+    app.use(express.static(clientDist));
+  }
 
   // Global auth gate (opt-in via DASHBOARD_ADMIN_PASSWORD)
   app.use(createAuthMiddleware());
@@ -62,20 +71,23 @@ function startServer(app, port) {
   const server = http.createServer(app);
   initWebSocket(server);
 
-  const isProduction = process.env.NODE_ENV === "production";
-  if (isProduction) {
+  // SPA catch-all — serve index.html for non-API routes not matched by static files.
+  // This must come AFTER all API routes and the auth middleware.
+  if (IS_PRODUCTION) {
     const clientDist = path.join(__dirname, "..", "client", "dist");
-    app.use(express.static(clientDist));
-    app.get("*", (_req, res) => {
+    app.get("*", (req, res) => {
+      // Don't catch API routes — let them 404 normally
+      if (req.originalUrl.startsWith("/api/")) return res.status(404).json({ error: "Not found" });
       res.sendFile(path.join(clientDist, "index.html"));
     });
   }
 
   return new Promise((resolve) => {
     server.listen(port, () => {
-      const mode = isProduction ? "production" : "development";
-      console.log(`Agent Dashboard server running on http://localhost:${port} (${mode})`);
-      if (!isProduction) {
+      const mode = IS_PRODUCTION ? "production" : "development";
+      const displayUrl = process.env.DASHBOARD_PUBLIC_URL || `http://localhost:${port}`;
+      console.log(`Agent Dashboard server running on ${displayUrl} (${mode})`);
+      if (!IS_PRODUCTION) {
         console.log(`Client dev server expected at http://localhost:5173`);
       }
       resolve(server);
