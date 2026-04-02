@@ -1,3 +1,22 @@
+// Load .env file if present (before any module that reads env vars)
+try {
+  const fs = require("fs");
+  const envPath = require("path").join(__dirname, "..", ".env");
+  if (fs.existsSync(envPath)) {
+    fs.readFileSync(envPath, "utf8")
+      .split("\n")
+      .filter((l) => l && !l.startsWith("#"))
+      .forEach((line) => {
+        const eq = line.indexOf("=");
+        if (eq > 0) {
+          const key = line.slice(0, eq).trim();
+          const val = line.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
+          if (!process.env[key]) process.env[key] = val;
+        }
+      });
+  }
+} catch {}
+
 if (!process.env.NODE_ENV) process.env.NODE_ENV = "production";
 
 const express = require("express");
