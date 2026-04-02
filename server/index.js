@@ -146,12 +146,12 @@ if (require.main === module) {
   const dbModule = require("./db");
   importAllSessions(dbModule)
     .then(({ imported, skipped, errors }) => {
-      if (imported > 0) console.log(`Imported ${imported} legacy sessions from ~/.claude/`);
+      if (imported > 0) console.log(`Imported ${imported} legacy sessions from ~/.claude-internal/`);
       if (errors > 0) console.log(`${errors} session files had errors during import`);
     })
     .then(() => backfillCompactions(dbModule))
     .then(({ backfilled }) => {
-      if (backfilled > 0) console.log(`Backfilled ${backfilled} compaction events from ~/.claude/`);
+      if (backfilled > 0) console.log(`Backfilled ${backfilled} compaction events from ~/.claude-internal/`);
     })
     .catch(() => {
       // Non-fatal — legacy import is best-effort

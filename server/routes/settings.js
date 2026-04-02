@@ -8,7 +8,7 @@ const { transcriptCache } = require("./hooks");
 
 const router = Router();
 
-const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
+const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude-internal", "settings.json");
 
 function getDbSize() {
   try {
@@ -99,7 +99,7 @@ router.post("/clear-data", (_req, res) => {
   res.json({ ok: true, cleared: counts });
 });
 
-// POST /api/settings/reimport — re-import legacy sessions from ~/.claude/
+// POST /api/settings/reimport — re-import legacy sessions from ~/.claude-internal/
 router.post("/reimport", async (_req, res) => {
   try {
     const { importAllSessions } = require("../../scripts/import-history");

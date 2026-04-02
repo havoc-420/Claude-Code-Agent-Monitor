@@ -2,14 +2,14 @@
 
 /**
  * Installs Claude Code hooks that forward events to the Agent Dashboard.
- * Modifies ~/.claude/settings.json to add hook entries.
+ * Modifies ~/.claude-internal/settings.json to add hook entries.
  */
 
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-const SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
+const SETTINGS_PATH = path.join(os.homedir(), ".claude-internal", "settings.json");
 const HOOK_HANDLER = path.resolve(__dirname, "hook-handler.js").replace(/\\/g, "/");
 
 // Hook types to install. Some support matchers, some don't.

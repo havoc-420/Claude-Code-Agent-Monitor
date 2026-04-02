@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Import legacy Claude Code sessions from ~/.claude/ into the Agent Dashboard.
+ * Import legacy Claude Code sessions from ~/.claude-internal/ into the Agent Dashboard.
  * Reads per-project JSONL session files to populate sessions, agents, and
  * token usage that existed before the dashboard was installed.
  *
@@ -13,7 +13,7 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
 
-const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, ".claude");
+const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, ".claude-internal");
 const PROJECTS_DIR = path.join(CLAUDE_DIR, "projects");
 
 /**
