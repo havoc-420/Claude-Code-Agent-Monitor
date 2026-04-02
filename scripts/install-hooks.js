@@ -10,7 +10,8 @@ const path = require("path");
 const os = require("os");
 
 const SETTINGS_PATH = path.join(os.homedir(), ".claude-internal", "settings.json");
-const HOOK_HANDLER = path.resolve(__dirname, "hook-handler.js").replace(/\\/g, "/");
+// Default: hook-handler.js sits next to this script (e.g. both downloaded to ~/.claude-internal/agent-monitor/)
+let HOOK_HANDLER = path.resolve(__dirname, "hook-handler.js").replace(/\\/g, "/");
 
 // Hook types to install. Some support matchers, some don't.
 const HOOKS_WITH_MATCHER = ["PreToolUse", "PostToolUse", "Stop", "SubagentStop", "Notification", "PermissionRequest"];
@@ -112,7 +113,17 @@ function installHooks(silent = false, opts = {}) {
 }
 
 if (require.main === module) {
-  installHooks(false);
+  // Support CLI args: node install-hooks.js [--handler PATH] [--url URL] [--api-key KEY]
+  const args = process.argv.slice(2);
+  const opts = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--handler" && args[i + 1]) {
+      HOOK_HANDLER = args[++i].replace(/\\/g, "/");
+    }
+    if (args[i] === "--url" && args[i + 1]) { opts.dashboardUrl = args[++i]; }
+    if (args[i] === "--api-key" && args[i + 1]) { opts.apiKey = args[++i]; }
+  }
+  installHooks(false, opts);
 }
 
 module.exports = { installHooks };

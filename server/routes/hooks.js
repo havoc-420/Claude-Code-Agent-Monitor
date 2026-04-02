@@ -456,6 +456,21 @@ router.get("/handler.js", (_req, res) => {
 });
 
 /**
+ * Serve install-hooks.js so remote clients can download and run it.
+ * Used by the setup-info one-liner.
+ */
+router.get("/install-hooks.js", (_req, res) => {
+  const installerPath = require("path").resolve(__dirname, "../../scripts/install-hooks.js");
+  const fs = require("fs");
+  if (!fs.existsSync(installerPath)) {
+    return res.status(404).json({ error: "install-hooks.js not found" });
+  }
+  res.setHeader("Content-Type", "application/javascript");
+  res.setHeader("Cache-Control", "no-cache");
+  fs.createReadStream(installerPath).pipe(res);
+});
+
+/**
  * Return setup info for remote Claude Code clients.
  * Used by the one-liner: curl -s "$DASHBOARD/api/hooks/setup-info?token=YOUR_TOKEN" | sh
  *
@@ -463,7 +478,7 @@ router.get("/handler.js", (_req, res) => {
  *   1. User creates a named API token in the Settings UI (e.g. "my-macbook")
  *   2. User runs: curl -s "https://dashboard/api/hooks/setup-info?token=xxx" | sh
  *   3. Server validates the token, then returns a shell script that downloads
- *      hook-handler.js and configures hooks using that same token.
+ *      hook-handler.js + install-hooks.js and runs the installer.
  *
  * If auth is disabled (no DASHBOARD_ADMIN_PASSWORD), no token is required and
  * the script is generated without one.
@@ -495,10 +510,12 @@ router.get("/setup-info", (req, res) => {
     || `${req.protocol}://${req.get("host")}`;
 
   const tokenJson = hookToken
-    ? `"${dashboardUrl}","hook_api_key":"${hookToken}"`
-    : `"${dashboardUrl}"`;
+    ? `,"hook_api_key":"${hookToken}"`
+    : "";
 
   // Build the one-liner shell script
+  // Downloads both scripts from the server, then runs install-hooks.js with correct args.
+  // No inline Node.js code — avoids escaping nightmares.
   const script = `#!/bin/sh
 # Auto-generated setup script for Claude Code Agent Monitor
 # Dashboard: ${dashboardUrl}
@@ -507,51 +524,28 @@ set -e
 
 HANDLER_DIR="$HOME/.claude-internal/agent-monitor"
 HANDLER_FILE="$HANDLER_DIR/hook-handler.js"
-SETTINGS_FILE="$HOME/.claude-internal/settings.json"
+INSTALLER_FILE="$HANDLER_DIR/install-hooks.js"
 DASHBOARD_SETTINGS="$HOME/.claude-internal/claude-dashboard.json"
 
-# 1. Download hook-handler.js
+# 1. Download scripts
 mkdir -p "$HANDLER_DIR"
-echo "Downloading hook-handler.js from ${dashboardUrl}..."
+echo "Downloading scripts from ${dashboardUrl}..."
 curl -sf "${dashboardUrl}/api/hooks/handler.js" -o "$HANDLER_FILE" || {
   echo "ERROR: Failed to download hook-handler.js"
   exit 1
 }
-chmod +x "$HANDLER_FILE"
-
-# 2. Write dashboard settings (URL + token)
-echo '{"dashboard_url":${tokenJson}}' > "$DASHBOARD_SETTINGS"
-echo "Dashboard settings saved to $DASHBOARD_SETTINGS"
-
-# 3. Install hooks into Claude Code settings
-node -e "
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-
-const HOOK_HANDLER = path.join(os.homedir(), '.claude-internal', 'agent-monitor', 'hook-handler.js').replace(/\\\\\\\\/g, '/');
-const SETTINGS_PATH = path.join(os.homedir(), '.claude-internal', 'settings.json');
-const HOOK_TYPES = ['PreToolUse','PostToolUse','Stop','SubagentStop','Notification','PermissionRequest','SessionStart','SessionEnd'];
-const WITH_MATCHER = new Set(['PreToolUse','PostToolUse','Stop','SubagentStop','Notification','PermissionRequest']);
-
-let settings = {};
-try { settings = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8')); } catch {}
-if (!settings.hooks) settings.hooks = {};
-
-for (const t of HOOK_TYPES) {
-  if (!settings.hooks[t]) settings.hooks[t] = [];
-  const cmd = 'node \"' + HOOK_HANDLER + '\" ' + t;
-  const entry = { hooks: [{ type: 'command', command: cmd }] };
-  if (WITH_MATCHER.has(t)) entry.matcher = '*';
-  const idx = settings.hooks[t].findIndex(e => (e.command && e.command.includes('hook-handler.js')) || (Array.isArray(e.hooks) && e.hooks.some(h => h.command && h.command.includes('hook-handler.js'))));
-  if (idx >= 0) settings.hooks[t][idx] = entry;
-  else settings.hooks[t].push(entry);
+curl -sf "${dashboardUrl}/api/hooks/install-hooks.js" -o "$INSTALLER_FILE" || {
+  echo "ERROR: Failed to download install-hooks.js"
+  exit 1
 }
 
-fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
-fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + '\\\\n', 'utf8');
-console.log('Claude Code hooks installed. Hook handler: ' + HOOK_HANDLER);
-"
+# 2. Write dashboard settings (URL + token)
+echo '{"dashboard_url":"${dashboardUrl}"${tokenJson}}' > "$DASHBOARD_SETTINGS"
+echo "Dashboard settings saved to $DASHBOARD_SETTINGS"
+
+# 3. Run install-hooks.js — it modifies ~/.claude-internal/settings.json
+echo "Installing Claude Code hooks..."
+node "$INSTALLER_FILE" --handler "$HANDLER_FILE"${hookToken ? " --api-key " + hookToken : ""}
 
 echo ""
 echo "Done! Claude Code hooks are configured to send events to ${dashboardUrl}"
