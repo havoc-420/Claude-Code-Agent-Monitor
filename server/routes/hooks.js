@@ -526,6 +526,34 @@ HANDLER_DIR="$HOME/.claude-internal/agent-monitor"
 HANDLER_FILE="$HANDLER_DIR/hook-handler.js"
 INSTALLER_FILE="$HANDLER_DIR/install-hooks.js"
 DASHBOARD_SETTINGS="$HOME/.claude-internal/claude-dashboard.json"
+SETTINGS_FILE="$HOME/.claude-internal/settings.json"
+
+# 0. Clean up previous agent-monitor installation
+echo "Cleaning up previous installation..."
+rm -rf "$HANDLER_DIR"
+rm -f "$DASHBOARD_SETTINGS"
+
+# Remove stale hook-handler entries from settings.json (if the file exists)
+if [ -f "$SETTINGS_FILE" ]; then
+  node -e "
+    const fs = require('fs');
+    const p = process.argv[1];
+    try {
+      const s = JSON.parse(fs.readFileSync(p, 'utf8'));
+      if (s.hooks) {
+        for (const k of Object.keys(s.hooks)) {
+          s.hooks[k] = s.hooks[k].filter(e => {
+            const str = JSON.stringify(e);
+            return !str.includes('hook-handler') && !str.includes('HOOK_HANDLER');
+          });
+          if (s.hooks[k].length === 0) delete s.hooks[k];
+        }
+        if (Object.keys(s.hooks).length === 0) delete s.hooks;
+      }
+      fs.writeFileSync(p, JSON.stringify(s, null, 2) + '\\n');
+    } catch {}
+  " "$SETTINGS_FILE"
+fi
 
 # 1. Download scripts
 mkdir -p "$HANDLER_DIR"
