@@ -308,15 +308,27 @@ export function Settings() {
     }
   };
 
+  const fallbackCopy = (text: string): boolean => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  };
+
   const handleCopyToken = async () => {
     if (!newlyCreatedToken) return;
     try {
       await navigator.clipboard.writeText(newlyCreatedToken.token);
-      setTokenCopied(true);
-      setTimeout(() => setTokenCopied(false), 2000);
     } catch {
-      // Clipboard not available
+      if (!fallbackCopy(newlyCreatedToken.token)) return;
     }
+    setTokenCopied(true);
+    setTimeout(() => setTokenCopied(false), 2000);
   };
 
   const handleCopySetupCmd = async () => {
@@ -325,11 +337,11 @@ export function Settings() {
     const cmd = `curl -s "${baseUrl}/api/hooks/setup-info?token=${newlyCreatedToken.token}" | sh`;
     try {
       await navigator.clipboard.writeText(cmd);
-      setSetupCmdCopied(true);
-      setTimeout(() => setSetupCmdCopied(false), 2000);
     } catch {
-      // Clipboard not available
+      if (!fallbackCopy(cmd)) return;
     }
+    setSetupCmdCopied(true);
+    setTimeout(() => setSetupCmdCopied(false), 2000);
   };
 
   const handleRevokeToken = async (id: string) => {
