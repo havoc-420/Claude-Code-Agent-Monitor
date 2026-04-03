@@ -43,6 +43,7 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed','error','abandoned')),
     cwd TEXT,
     model TEXT,
+    token_name TEXT,
     started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     ended_at TEXT,
     metadata TEXT
@@ -186,6 +187,13 @@ try {
   db.pragma("foreign_keys = ON");
 }
 
+// Migrate: add token_name to sessions (stores API token name as identity label for multi-client setups)
+try {
+  db.prepare("SELECT token_name FROM sessions LIMIT 1").get();
+} catch {
+  db.prepare("ALTER TABLE sessions ADD COLUMN token_name TEXT").run();
+}
+
 // Migrate: add updated_at columns to sessions and agents
 try {
   db.prepare("SELECT updated_at FROM sessions LIMIT 1").get();
@@ -312,7 +320,7 @@ const stmts = {
      WHERE s.status = ? GROUP BY s.id ORDER BY s.updated_at DESC LIMIT ? OFFSET ?`
   ),
   insertSession: db.prepare(
-    "INSERT INTO sessions (id, name, status, cwd, model, started_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?)"
+    "INSERT INTO sessions (id, name, status, cwd, model, token_name, started_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?)"
   ),
   updateSession: db.prepare(
     "UPDATE sessions SET name = COALESCE(?, name), status = COALESCE(?, status), ended_at = COALESCE(?, ended_at), metadata = COALESCE(?, metadata), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
@@ -322,22 +330,22 @@ const stmts = {
   ),
 
   getAgent: db.prepare(`
-    SELECT a.*, s.cwd as session_cwd
+    SELECT a.*, s.cwd as session_cwd, s.token_name
     FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
     WHERE a.id = ?
   `),
   listAgents: db.prepare(`
-    SELECT a.*, s.cwd as session_cwd
+    SELECT a.*, s.cwd as session_cwd, s.token_name
     FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
     ORDER BY a.started_at DESC LIMIT ? OFFSET ?
   `),
   listAgentsBySession: db.prepare(`
-    SELECT a.*, s.cwd as session_cwd
+    SELECT a.*, s.cwd as session_cwd, s.token_name
     FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
     WHERE a.session_id = ? ORDER BY a.started_at ASC
   `),
   listAgentsByStatus: db.prepare(`
-    SELECT a.*, s.cwd as session_cwd
+    SELECT a.*, s.cwd as session_cwd, s.token_name
     FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
     WHERE a.status = ? ORDER BY a.started_at DESC LIMIT ? OFFSET ?
   `),

@@ -9,7 +9,7 @@ const router = Router();
 // Shared cache instance — reused by periodic compaction scanner via router.transcriptCache
 const transcriptCache = new TranscriptCache();
 
-function ensureSession(sessionId, data) {
+function ensureSession(sessionId, data, tokenName) {
   let session = stmts.getSession.get(sessionId);
   if (!session) {
     stmts.insertSession.run(
@@ -18,6 +18,7 @@ function ensureSession(sessionId, data) {
       "active",
       data.cwd || null,
       data.model || null,
+      tokenName || null,
       null
     );
     session = stmts.getSession.get(sessionId);
@@ -46,11 +47,11 @@ function getMainAgent(sessionId) {
   return stmts.getAgent.get(`${sessionId}-main`);
 }
 
-const processEvent = db.transaction((hookType, data) => {
+const processEvent = db.transaction((hookType, data, tokenName) => {
   const sessionId = data.session_id;
   if (!sessionId) return null;
 
-  const session = ensureSession(sessionId, data);
+  const session = ensureSession(sessionId, data, tokenName);
   let mainAgent = getMainAgent(sessionId);
   const mainAgentId = mainAgent?.id ?? null;
 
@@ -430,7 +431,17 @@ router.post("/event", (req, res) => {
     });
   }
 
-  const result = processEvent(hook_type, data);
+  // Resolve token name from the authenticated API token (if any)
+  const tokenValue = req.headers["x-api-key"] || req.query.token;
+  let tokenName = null;
+  if (tokenValue) {
+    const tokenRow = stmts.getTokenByValue.get(tokenValue);
+    if (tokenRow) {
+      tokenName = tokenRow.name;
+    }
+  }
+
+  const result = processEvent(hook_type, data, tokenName);
   if (!result) {
     return res.status(400).json({
       error: { code: "MISSING_SESSION", message: "session_id is required in data" },

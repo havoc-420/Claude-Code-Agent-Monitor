@@ -20,6 +20,7 @@ export interface Agent {
   id: string;
   session_id: string;
   session_cwd?: string | null;
+  token_name?: string | null;
   name: string;
   type: AgentType;
   subagent_type: string | null;

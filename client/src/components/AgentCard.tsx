@@ -1,4 +1,4 @@
-import { Bot, GitBranch, Clock, Wrench } from "lucide-react";
+import { Bot, GitBranch, Clock, Wrench, Tag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AgentStatusBadge } from "./StatusBadge";
 import type { Agent } from "../lib/types";
@@ -48,13 +48,17 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
             <p className="text-sm font-medium text-gray-200 truncate">
               {agent.session_cwd ? agent.session_cwd.split("/").pop() : agent.name}
             </p>
-            {agent.session_cwd ? (
-              <p className="text-[11px] text-gray-500 truncate">
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+              <span className="text-[11px] text-gray-500 truncate">
                 {agent.name}{agent.subagent_type ? ` · ${agent.subagent_type}` : ""}
-              </p>
-            ) : agent.subagent_type ? (
-              <p className="text-[11px] text-gray-500 truncate">{agent.subagent_type}</p>
-            ) : null}
+              </span>
+              {agent.token_name && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-px rounded-full flex-shrink-0">
+                  <Tag className="w-2.5 h-2.5" />
+                  {agent.token_name}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <AgentStatusBadge status={agent.status} />
