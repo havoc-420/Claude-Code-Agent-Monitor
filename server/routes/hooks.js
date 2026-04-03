@@ -6,6 +6,18 @@ const TranscriptCache = require("../lib/transcript-cache");
 
 const router = Router();
 
+// Toggle hook event logging via environment variable.  // TODO to readme
+// Set HOOK_LOG=true (or 1) to print every received event to server stdout.
+const HOOK_LOG_ENABLED = process.env.HOOK_LOG === "true" || process.env.HOOK_LOG === "1";
+console.log("[hook] Hook logging enabled:", HOOK_LOG_ENABLED);
+
+/** Log a hook event if logging is enabled */
+function hookLog(...args) {
+  if (HOOK_LOG_ENABLED) {
+    console.log("[hook]", ...args);
+  }
+}
+
 // Shared cache instance — reused by periodic compaction scanner via router.transcriptCache
 const transcriptCache = new TranscriptCache();
 
@@ -40,6 +52,17 @@ function ensureSession(sessionId, data, tokenName, platform) {
       null
     );
     broadcast("agent_created", stmts.getAgent.get(mainAgentId));
+  } else {
+    // Sync platform + token_name from the current API token on every event.
+    // The same session may be reused with a different token (e.g., token's
+    // platform was updated after initial registration).
+    const currentPlatform = session.platform || "claude";
+    if (platform && platform !== currentPlatform) {
+      stmts.updateSessionPlatform.run(platform, sessionId);
+    }
+    if (tokenName !== null && tokenName !== session.token_name) {
+      stmts.updateSessionTokenName.run(tokenName, sessionId);
+    }
   }
   return session;
 }
@@ -456,6 +479,8 @@ router.post("/event", (req, res) => {
     });
   }
 
+  hookLog(`${hook_type}`, data.session_id ? `(session=${data.session_id.slice(0, 8)})` : "", data.tool_name ? `[${data.tool_name}]` : "");
+
   // Resolve token name and platform from the authenticated API token (if any)
   const tokenValue = req.headers["x-api-key"] || req.query.token;
   let tokenName = null;
@@ -474,6 +499,8 @@ router.post("/event", (req, res) => {
       error: { code: "MISSING_SESSION", message: "session_id is required in data" },
     });
   }
+
+  hookLog(`  → ${result.event_type} | ${result.summary?.slice(0, 80)}`);
 
   res.json({ ok: true, event: result });
 });

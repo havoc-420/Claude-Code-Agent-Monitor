@@ -349,24 +349,38 @@ const stmts = {
   reactivateSession: db.prepare(
     "UPDATE sessions SET status = 'active', ended_at = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
   ),
+  updateSessionPlatform: db.prepare(
+    "UPDATE sessions SET platform = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
+  ),
+  updateSessionTokenName: db.prepare(
+    "UPDATE sessions SET token_name = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
+  ),
 
   getAgent: db.prepare(`
-    SELECT a.*, s.cwd as session_cwd, s.token_name
+    SELECT a.*, s.cwd as session_cwd, s.token_name, s.platform,
+      (SELECT e.summary FROM events e WHERE e.agent_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) as last_event_summary,
+      (SELECT e.event_type FROM events e WHERE e.agent_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) as last_event_type
     FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
     WHERE a.id = ?
   `),
   listAgents: db.prepare(`
-    SELECT a.*, s.cwd as session_cwd, s.token_name
+    SELECT a.*, s.cwd as session_cwd, s.token_name, s.platform,
+      (SELECT e.summary FROM events e WHERE e.agent_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) as last_event_summary,
+      (SELECT e.event_type FROM events e WHERE e.agent_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) as last_event_type
     FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
     ORDER BY a.started_at DESC LIMIT ? OFFSET ?
   `),
   listAgentsBySession: db.prepare(`
-    SELECT a.*, s.cwd as session_cwd, s.token_name
+    SELECT a.*, s.cwd as session_cwd, s.token_name, s.platform,
+      (SELECT e.summary FROM events e WHERE e.agent_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) as last_event_summary,
+      (SELECT e.event_type FROM events e WHERE e.agent_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) as last_event_type
     FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
     WHERE a.session_id = ? ORDER BY a.started_at ASC
   `),
   listAgentsByStatus: db.prepare(`
-    SELECT a.*, s.cwd as session_cwd, s.token_name
+    SELECT a.*, s.cwd as session_cwd, s.token_name, s.platform,
+      (SELECT e.summary FROM events e WHERE e.agent_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) as last_event_summary,
+      (SELECT e.event_type FROM events e WHERE e.agent_id = a.id ORDER BY e.created_at DESC, e.id DESC LIMIT 1) as last_event_type
     FROM agents a LEFT JOIN sessions s ON s.id = a.session_id
     WHERE a.status = ? ORDER BY a.started_at DESC LIMIT ? OFFSET ?
   `),

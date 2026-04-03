@@ -1,8 +1,14 @@
-import { Bot, GitBranch, Clock, Wrench, Tag } from "lucide-react";
+import { Bot, GitBranch, Clock, Wrench, Tag, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AgentStatusBadge } from "./StatusBadge";
-import type { Agent } from "../lib/types";
+import type { Agent, Platform } from "../lib/types";
 import { formatDuration, timeAgo } from "../lib/format";
+import { PLATFORM_CONFIG } from "../lib/types";
+
+const platformDotMap: Record<string, string> = {
+  claude: "bg-blue-400",
+  codebuddy: "bg-cyan-400",
+};
 
 interface AgentCardProps {
   agent: Agent;
@@ -52,8 +58,20 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
               <span className="text-[11px] text-gray-500 truncate">
                 {agent.name}{agent.subagent_type ? ` · ${agent.subagent_type}` : ""}
               </span>
+              {agent.platform && (
+                <span
+                  className={`inline-flex items-center gap-0.5 text-[10px] border px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                    agent.platform === "claude"
+                      ? "text-blue-400 bg-blue-500/10 border-blue-500/20"
+                      : "text-cyan-400 bg-cyan-500/10 border-cyan-500/20"
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${platformDotMap[agent.platform] ?? "bg-gray-400"}`} />
+                  {agent.platform === "claude" ? "Claude" : "CodeBuddy"}
+                </span>
+              )}
               {agent.token_name && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-px rounded-full flex-shrink-0">
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full flex-shrink-0">
                   <Tag className="w-2.5 h-2.5" />
                   {agent.token_name}
                 </span>
@@ -65,7 +83,14 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
       </div>
 
       {agent.task && (
-        <p className="text-xs text-gray-400 mb-3 line-clamp-2 leading-relaxed">{agent.task}</p>
+        <p className="text-xs text-gray-400 mb-2 line-clamp-2 leading-relaxed">{agent.task}</p>
+      )}
+
+      {agent.last_event_summary && (
+        <div className="flex items-start gap-1.5 mb-3 text-[11px] text-gray-500 bg-surface-2 rounded-md px-2.5 py-1.5">
+          <Sparkles className="w-3 h-3 flex-shrink-0 mt-0.5 text-violet-400/70" />
+          <span className="line-clamp-2 leading-relaxed">{agent.last_event_summary}</span>
+        </div>
       )}
 
       <div className="flex items-center gap-4 text-[11px] text-gray-500 min-w-0 overflow-hidden">

@@ -22,6 +22,9 @@ export interface Agent {
   session_id: string;
   session_cwd?: string | null;
   token_name?: string | null;
+  platform?: string;
+  last_event_summary?: string | null;
+  last_event_type?: string | null;
   name: string;
   type: AgentType;
   subagent_type: string | null;
