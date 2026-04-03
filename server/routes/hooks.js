@@ -9,7 +9,7 @@ const router = Router();
 // Shared cache instance — reused by periodic compaction scanner via router.transcriptCache
 const transcriptCache = new TranscriptCache();
 
-function ensureSession(sessionId, data, tokenName) {
+function ensureSession(sessionId, data, tokenName, platform) {
   let session = stmts.getSession.get(sessionId);
   if (!session) {
     stmts.insertSession.run(
@@ -19,6 +19,7 @@ function ensureSession(sessionId, data, tokenName) {
       data.cwd || null,
       data.model || null,
       tokenName || null,
+      platform || "claude",
       null
     );
     session = stmts.getSession.get(sessionId);
@@ -47,11 +48,11 @@ function getMainAgent(sessionId) {
   return stmts.getAgent.get(`${sessionId}-main`);
 }
 
-const processEvent = db.transaction((hookType, data, tokenName) => {
+const processEvent = db.transaction((hookType, data, tokenName, platform) => {
   const sessionId = data.session_id;
   if (!sessionId) return null;
 
-  const session = ensureSession(sessionId, data, tokenName);
+  const session = ensureSession(sessionId, data, tokenName, platform);
   let mainAgent = getMainAgent(sessionId);
   const mainAgentId = mainAgent?.id ?? null;
 
@@ -310,6 +311,30 @@ const processEvent = db.transaction((hookType, data, tokenName) => {
       break;
     }
 
+    case "UserPromptSubmit": {
+      // CodeBuddy event: user submitted a prompt before agent processes it
+      const promptPreview = data.prompt ? data.prompt.slice(0, 100) : null;
+      summary = promptPreview
+        ? `User prompt: ${promptPreview}${data.prompt.length > 100 ? "..." : ""}`
+        : "User prompt submitted";
+
+      // Transition main agent from idle/connected to working
+      if (
+        mainAgent &&
+        (mainAgent.status === "idle" || mainAgent.status === "connected")
+      ) {
+        stmts.updateAgent.run(null, "working", null, null, null, null, mainAgentId);
+        broadcast("agent_updated", stmts.getAgent.get(mainAgentId));
+      }
+      break;
+    }
+
+    case "PreCompact": {
+      // CodeBuddy event: conversation context is about to be compacted
+      summary = "Pre-compaction triggered";
+      break;
+    }
+
     default: {
       summary = `Event: ${hookType}`;
     }
@@ -431,17 +456,19 @@ router.post("/event", (req, res) => {
     });
   }
 
-  // Resolve token name from the authenticated API token (if any)
+  // Resolve token name and platform from the authenticated API token (if any)
   const tokenValue = req.headers["x-api-key"] || req.query.token;
   let tokenName = null;
+  let platform = "claude"; // default when no token provided
   if (tokenValue) {
     const tokenRow = stmts.getTokenByValue.get(tokenValue);
     if (tokenRow) {
       tokenName = tokenRow.name;
+      platform = tokenRow.platform || "claude";
     }
   }
 
-  const result = processEvent(hook_type, data, tokenName);
+  const result = processEvent(hook_type, data, tokenName, platform);
   if (!result) {
     return res.status(400).json({
       error: { code: "MISSING_SESSION", message: "session_id is required in data" },
@@ -482,8 +509,9 @@ router.get("/install-hooks.js", (_req, res) => {
 });
 
 /**
- * Return setup info for remote Claude Code clients.
+ * Return setup info for remote Claude Code or CodeBuddy clients.
  * Used by the one-liner: curl -s "$DASHBOARD/api/hooks/setup-info?token=YOUR_TOKEN" | sh
+ * For CodeBuddy: curl -s "$DASHBOARD/api/hooks/setup-info?token=YOUR_TOKEN&platform=codebuddy" | sh
  *
  * Flow:
  *   1. User creates a named API token in the Settings UI (e.g. "my-macbook")
@@ -498,6 +526,7 @@ router.get("/setup-info", (req, res) => {
   const { ADMIN_PASSWORD, DASHBOARD_API_KEY } = require("../middleware/auth");
   const { stmts } = require("../db");
   let hookToken = null;
+  let tokenPlatform = "claude";
 
   if (ADMIN_PASSWORD) {
     // Auth enabled — require a valid API token
@@ -513,7 +542,14 @@ router.get("/setup-info", (req, res) => {
     }
     // Use the caller's own token — each machine gets its own named token
     hookToken = provided;
+    // Derive platform from token record (takes priority over query param)
+    if (tokenRow) tokenPlatform = tokenRow.platform || "claude";
   }
+
+  // Allow ?platform=codebuddy query param override (for tokens without platform set)
+  const validPlatforms = ["claude", "codebuddy"];
+  const platform = validPlatforms.includes(req.query.platform) ? req.query.platform : tokenPlatform;
+  const isCodeBuddy = platform === "codebuddy";
 
   // Derive the public-facing base URL.
   // Priority: DASHBOARD_PUBLIC_URL env > request headers (for reverse-proxy setups)
@@ -527,20 +563,24 @@ router.get("/setup-info", (req, res) => {
   // Query-string token for authenticated downloads (handler.js, install-hooks.js)
   const tokenQs = hookToken ? `?token=${hookToken}` : "";
 
+  // Platform-specific paths
+  const configDir = isCodeBuddy ? "$HOME/.codebuddy" : "$HOME/.claude-internal";
+  const platformLabel = isCodeBuddy ? "CodeBuddy" : "Claude Code";
+
   // Build the one-liner shell script
   // Downloads both scripts from the server, then runs install-hooks.js with correct args.
   // No inline Node.js code — avoids escaping nightmares.
   const script = `#!/bin/sh
-# Auto-generated setup script for Claude Code Agent Monitor
+# Auto-generated setup script for Agent Monitor (${platformLabel})
 # Dashboard: ${dashboardUrl}
 
 set -e
 
-HANDLER_DIR="$HOME/.claude-internal/agent-monitor"
+HANDLER_DIR="${configDir}/agent-monitor"
 HANDLER_FILE="$HANDLER_DIR/hook-handler.js"
 INSTALLER_FILE="$HANDLER_DIR/install-hooks.js"
-DASHBOARD_SETTINGS="$HOME/.claude-internal/claude-dashboard.json"
-SETTINGS_FILE="$HOME/.claude-internal/settings.json"
+DASHBOARD_SETTINGS="${configDir}/claude-dashboard.json"
+SETTINGS_FILE="${configDir}/settings.json"
 
 # 0. Clean up previous agent-monitor installation
 echo "Cleaning up previous installation..."
@@ -585,17 +625,17 @@ curl -sf "${dashboardUrl}/api/hooks/install-hooks.js${tokenQs}" -o "$INSTALLER_F
 echo '{"dashboard_url":"${dashboardUrl}"${tokenJson}}' > "$DASHBOARD_SETTINGS"
 echo "Dashboard settings saved to $DASHBOARD_SETTINGS"
 
-# 3. Run install-hooks.js — it modifies ~/.claude-internal/settings.json
-echo "Installing Claude Code hooks..."
-node "$INSTALLER_FILE" --handler "$HANDLER_FILE"
+# 3. Run install-hooks.js — it modifies the platform settings.json
+echo "Installing ${platformLabel} hooks..."
+node "$INSTALLER_FILE" --handler "$HANDLER_FILE" --platform ${platform}
 
 echo ""
-echo "Done! Claude Code hooks are configured to send events to ${dashboardUrl}"
-echo "Start a new Claude Code session to begin tracking."
+echo "Done! ${platformLabel} hooks are configured to send events to ${dashboardUrl}"
+echo "Start a new ${platformLabel} session to begin tracking."
 `;
 
   res.setHeader("Content-Type", "application/x-sh");
-  res.setHeader("Content-Disposition", "inline; filename=\"setup-agent-monitor.sh\"");
+  res.setHeader("Content-Disposition", `inline; filename="setup-${platform}-monitor.sh"`);
   res.send(script);
 });
 

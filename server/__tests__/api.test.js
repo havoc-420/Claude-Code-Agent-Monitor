@@ -660,6 +660,8 @@ describe("Hook Event Processing", () => {
       "completed",
       "/tmp",
       "claude-sonnet-4-6",
+      null,
+      "claude",
       null
     );
     stmts.insertAgent.run(
@@ -953,7 +955,7 @@ describe("Hook Event Processing", () => {
 describe("Database Integrity", () => {
   it("should enforce session status CHECK constraint", () => {
     assert.throws(() => {
-      stmts.insertSession.run("bad-status", "test", "invalid_status", null, null, null);
+      stmts.insertSession.run("bad-status", "test", "invalid_status", null, null, null, "claude", null);
     });
   });
 
@@ -991,7 +993,7 @@ describe("Database Integrity", () => {
 
   it("should cascade delete agents when session is deleted", () => {
     // Create a session with agents
-    stmts.insertSession.run("cascade-test", "Cascade Test", "active", null, null, null);
+    stmts.insertSession.run("cascade-test", "Cascade Test", "active", null, null, null, "claude", null);
     stmts.insertAgent.run(
       "cascade-agent",
       "cascade-test",

@@ -46,7 +46,8 @@ import { api } from "../lib/api";
 import { eventBus } from "../lib/eventBus";
 import { fmt, fmtCost } from "../lib/format";
 import { Tip } from "../components/Tip";
-import type { ModelPricing, WSMessage } from "../lib/types";
+import type { ModelPricing, Platform, WSMessage } from "../lib/types";
+import { PLATFORM_CONFIG } from "../lib/types";
 
 // ─── Notification preferences ───
 
@@ -203,16 +204,19 @@ export function Settings() {
   interface ApiToken {
     id: string;
     name: string;
+    platform: Platform;
     created_at: string;
     last_used_at: string | null;
   }
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [tokensLoading, setTokensLoading] = useState(false);
   const [newTokenName, setNewTokenName] = useState("");
+  const [newTokenPlatform, setNewTokenPlatform] = useState<Platform>("claude");
   const [creatingToken, setCreatingToken] = useState(false);
   const [newlyCreatedToken, setNewlyCreatedToken] = useState<{
     id: string;
     name: string;
+    platform: Platform;
     token: string;
   } | null>(null);
   const [tokenCopied, setTokenCopied] = useState(false);
@@ -297,9 +301,10 @@ export function Settings() {
     if (!newTokenName.trim()) return;
     setCreatingToken(true);
     try {
-      const result = await api.auth.createToken(newTokenName.trim());
-      setNewlyCreatedToken({ id: result.id, name: result.name, token: result.token });
+      const result = await api.auth.createToken(newTokenName.trim(), newTokenPlatform);
+      setNewlyCreatedToken({ id: result.id, name: result.name, platform: result.platform, token: result.token });
       setNewTokenName("");
+      setNewTokenPlatform("claude");
       await loadTokens();
     } catch {
       // Silently ignore
@@ -334,7 +339,8 @@ export function Settings() {
   const handleCopySetupCmd = async () => {
     if (!newlyCreatedToken) return;
     const baseUrl = window.location.origin;
-    const cmd = `curl -s "${baseUrl}/api/hooks/setup-info?token=${newlyCreatedToken.token}" | sh`;
+    const platform = newlyCreatedToken.platform === "codebuddy" ? "&platform=codebuddy" : "";
+    const cmd = `curl -s "${baseUrl}/api/hooks/setup-info?token=${newlyCreatedToken.token}${platform}" | sh`;
     try {
       await navigator.clipboard.writeText(cmd);
     } catch {
@@ -1242,6 +1248,27 @@ export function Settings() {
               className="input flex-1 text-sm"
               disabled={creatingToken}
             />
+            <div className="flex gap-0.5 bg-surface-2 rounded-lg p-0.5 flex-shrink-0">
+              {([
+                { label: "Claude", value: "claude" as Platform, dot: "bg-blue-400" },
+                { label: "CodeBuddy", value: "codebuddy" as Platform, dot: "bg-cyan-400" },
+              ]).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setNewTokenPlatform(opt.value)}
+                  disabled={creatingToken}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 ${
+                    newTokenPlatform === opt.value
+                      ? "bg-surface-4 text-gray-200 shadow-sm"
+                      : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${opt.dot}`} />
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             <button
               onClick={handleCreateToken}
               disabled={creatingToken || !newTokenName.trim()}
@@ -1260,7 +1287,11 @@ export function Settings() {
           {newlyCreatedToken && (
             <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 space-y-3">
               <p className="text-xs text-emerald-400 font-medium">
-                Token created: <span className="text-gray-200">{newlyCreatedToken.name}</span> — copy it now, it will not be shown again.
+                Token created: <span className="text-gray-200">{newlyCreatedToken.name}</span>
+                <span className={`ml-1.5 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${PLATFORM_CONFIG[newlyCreatedToken.platform].bg} ${PLATFORM_CONFIG[newlyCreatedToken.platform].color}`}>
+                  {PLATFORM_CONFIG[newlyCreatedToken.platform].label}
+                </span>
+                — copy it now, it will not be shown again.
               </p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 text-xs font-mono bg-surface-1 border border-border rounded px-3 py-2 text-gray-200 break-all">
@@ -1284,7 +1315,7 @@ export function Settings() {
 
               {/* One-liner setup command */}
               <div>
-                <p className="text-xs text-gray-400 mb-1.5">Run on target machine to connect Claude Code:</p>
+                <p className="text-xs text-gray-400 mb-1.5">Run on target machine to connect {PLATFORM_CONFIG[newlyCreatedToken.platform].label}:</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-xs font-mono bg-surface-1 border border-border rounded px-3 py-2 text-blue-300 break-all select-all">
                     curl -s &quot;{window.location.origin}/api/hooks/setup-info?token={newlyCreatedToken.token}&quot; | sh
@@ -1313,7 +1344,12 @@ export function Settings() {
               {tokens.map((tok) => (
                 <div key={tok.id} className="flex items-center justify-between py-3 gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm text-gray-200 truncate">{tok.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-gray-200 truncate">{tok.name}</p>
+                      <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border flex-shrink-0 ${PLATFORM_CONFIG[tok.platform].bg} ${PLATFORM_CONFIG[tok.platform].color}`}>
+                        {PLATFORM_CONFIG[tok.platform].label}
+                      </span>
+                    </div>
                     <p className="text-xs text-gray-500 mt-0.5">
                       Created {formatTimestamp(tok.created_at)}
                       {tok.last_used_at && (

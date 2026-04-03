@@ -14,7 +14,7 @@ import { api } from "../lib/api";
 import { eventBus } from "../lib/eventBus";
 import { fmt, fmtCost, fmtCostFull } from "../lib/format";
 import { Tip } from "../components/Tip";
-import type { Analytics as AnalyticsData, CostResult } from "../lib/types";
+import type { Analytics as AnalyticsData, CostResult, Platform } from "../lib/types";
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
 
@@ -393,12 +393,13 @@ export function Analytics() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"tokens" | "workflow" | "productivity">("tokens");
+  const [platform, setPlatform] = useState<Platform | "">("");
   const wsConnected = useSyncExternalStore(eventBus.onConnection, () => eventBus.connected);
 
   const load = useCallback(async () => {
     try {
       const [result, cost] = await Promise.all([
-        api.analytics.get(),
+        api.analytics.get(platform || undefined),
         api.pricing.totalCost().catch(() => null),
       ]);
       setData(result);
@@ -567,6 +568,26 @@ export function Analytics() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex gap-1 bg-surface-2 rounded-lg p-1">
+            {([
+              { label: "All", value: "", dot: "" },
+              { label: "Claude", value: "claude" as const, dot: "bg-blue-400" },
+              { label: "CodeBuddy", value: "codebuddy" as const, dot: "bg-cyan-400" },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => { setPlatform(opt.value); setLoading(true); }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  platform === opt.value
+                    ? "bg-surface-4 text-gray-200"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                {opt.dot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${opt.dot}`} />}
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <button onClick={load} className="btn-ghost" disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             Refresh

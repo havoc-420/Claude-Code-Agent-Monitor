@@ -81,6 +81,8 @@ function seed() {
       "active",
       "/home/dev/my-app",
       "claude-opus-4-6",
+      null,
+      "claude",
       null
     );
     sessions.push(activeSessionId);
@@ -93,6 +95,8 @@ function seed() {
       "active",
       "/home/dev/payment-service",
       "claude-sonnet-4-6",
+      null,
+      "claude",
       null
     );
     sessions.push(activeSessionId2);
@@ -112,6 +116,8 @@ function seed() {
         "completed",
         randomItem(["/home/dev/api", "/home/dev/frontend", "/home/dev/worker"]),
         randomItem(["claude-opus-4-6", "claude-sonnet-4-6"]),
+        null,
+        "claude",
         null
       );
       // Set ended_at
@@ -130,6 +136,8 @@ function seed() {
       "error",
       "/home/dev/infra",
       "claude-opus-4-6",
+      null,
+      "claude",
       null
     );
     db.prepare("UPDATE sessions SET ended_at = ? WHERE id = ?").run(minutesAgo(45), errSessionId);

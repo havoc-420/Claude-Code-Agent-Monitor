@@ -5,14 +5,25 @@ const { calculateCost } = require("./pricing");
 
 const router = Router();
 
+const VALID_PLATFORMS = ["claude", "codebuddy"];
+
 router.get("/", (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 1000);
   const offset = parseInt(req.query.offset) || 0;
   const status = req.query.status;
+  const platform = req.query.platform;
+  const usePlatform = platform && VALID_PLATFORMS.includes(platform);
 
-  const rows = status
-    ? stmts.listSessionsByStatus.all(status, limit, offset)
-    : stmts.listSessions.all(limit, offset);
+  let rows;
+  if (usePlatform && status) {
+    rows = stmts.listSessionsByPlatformAndStatus.all(platform, status, limit, offset);
+  } else if (usePlatform) {
+    rows = stmts.listSessionsByPlatform.all(platform, limit, offset);
+  } else if (status) {
+    rows = stmts.listSessionsByStatus.all(status, limit, offset);
+  } else {
+    rows = stmts.listSessions.all(limit, offset);
+  }
 
   // Bulk-compute costs for all returned sessions in a single pass
   if (rows.length > 0) {
@@ -76,6 +87,8 @@ router.post("/", (req, res) => {
     "active",
     cwd || null,
     model || null,
+    null,
+    "claude",
     metadata ? JSON.stringify(metadata) : null
   );
   const session = stmts.getSession.get(id);

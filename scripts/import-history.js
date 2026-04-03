@@ -373,6 +373,8 @@ function importSession(dbModule, session) {
     sessionStatus,
     session.cwd,
     session.model,
+    null,
+    "claude",
     metadata
   );
 

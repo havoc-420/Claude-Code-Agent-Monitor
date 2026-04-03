@@ -6,7 +6,8 @@ import { eventBus } from "../lib/eventBus";
 import { SessionStatusBadge } from "../components/StatusBadge";
 import { EmptyState } from "../components/EmptyState";
 import { formatDateTime, formatDuration, truncate, fmtCost } from "../lib/format";
-import type { Session, SessionStatus, DashboardEvent } from "../lib/types";
+import type { Session, SessionStatus, DashboardEvent, Platform } from "../lib/types";
+import { PLATFORM_CONFIG } from "../lib/types";
 
 const FILTER_OPTIONS: Array<{ label: string; value: string }> = [
   { label: "All", value: "" },
@@ -16,26 +17,34 @@ const FILTER_OPTIONS: Array<{ label: string; value: string }> = [
   { label: "Abandoned", value: "abandoned" },
 ];
 
+const PLATFORM_FILTER_OPTIONS: Array<{ label: string; value: string; dot?: string }> = [
+  { label: "All", value: "" },
+  { label: "Claude", value: "claude", dot: "bg-blue-400" },
+  { label: "CodeBuddy", value: "codebuddy", dot: "bg-cyan-400" },
+];
+
 const PAGE_SIZE = 10;
 
 export function Sessions() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [filter, setFilter] = useState("");
+  const [platformFilter, setPlatformFilter] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
 
   const load = useCallback(async () => {
     try {
-      const params: { status?: string; limit?: number } = { limit: 500 };
+      const params: { status?: string; platform?: Platform; limit?: number } = { limit: 500 };
       if (filter) params.status = filter;
+      if (platformFilter) params.platform = platformFilter as Platform;
       const sessionsRes = await api.sessions.list(params);
       setSessions(sessionsRes.sessions);
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, platformFilter]);
 
   useEffect(() => {
     load();
@@ -69,10 +78,10 @@ export function Sessions() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  // Reset page when filter/search changes
+  // Reset page when filter/search/platform changes
   useEffect(() => {
     setPage(0);
-  }, [filter, search]);
+  }, [filter, search, platformFilter]);
 
   return (
     <div className="animate-fade-in">
@@ -120,6 +129,21 @@ export function Sessions() {
               {opt.label}
             </button>
           ))}
+          <div className="w-px bg-border mx-1" />
+          {PLATFORM_FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setPlatformFilter(opt.value)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                platformFilter === opt.value
+                  ? "bg-surface-4 text-gray-200"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              {opt.dot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${opt.dot}`} />}
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -144,6 +168,9 @@ export function Sessions() {
                   </th>
                   <th className="px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                     Status
+                  </th>
+                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                    Platform
                   </th>
                   <th className="px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                     Last Active
@@ -182,6 +209,11 @@ export function Sessions() {
                     </td>
                     <td className="px-5 py-4">
                       <SessionStatusBadge status={session.status as SessionStatus} />
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${PLATFORM_CONFIG[(session.platform as Platform) || "claude"].bg} ${PLATFORM_CONFIG[(session.platform as Platform) || "claude"].color}`}>
+                        {PLATFORM_CONFIG[(session.platform as Platform) || "claude"].label}
+                      </span>
                     </td>
                     <td className="px-5 py-4 text-sm text-gray-400">
                       {formatDateTime(session.last_activity || session.started_at)}

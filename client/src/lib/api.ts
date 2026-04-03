@@ -1,9 +1,11 @@
 import type {
   Agent,
   Analytics,
+  ApiToken,
   CostResult,
   DashboardEvent,
   ModelPricing,
+  Platform,
   Session,
   SessionDrillIn,
   Stats,
@@ -26,13 +28,17 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   stats: {
-    get: () => request<Stats>("/stats"),
+    get: (platform?: Platform) => {
+      const qs = platform ? `?platform=${platform}` : "";
+      return request<Stats>(`/stats${qs}`);
+    },
   },
 
   sessions: {
-    list: (params?: { status?: string; limit?: number; offset?: number }) => {
+    list: (params?: { status?: string; platform?: Platform; limit?: number; offset?: number }) => {
       const qs = new URLSearchParams();
       if (params?.status) qs.set("status", params.status);
+      if (params?.platform) qs.set("platform", params.platform);
       if (params?.limit) qs.set("limit", String(params.limit));
       if (params?.offset) qs.set("offset", String(params.offset));
       const q = qs.toString();
@@ -68,7 +74,10 @@ export const api = {
   },
 
   analytics: {
-    get: () => request<Analytics>("/analytics"),
+    get: (platform?: Platform) => {
+      const qs = platform ? `?platform=${platform}` : "";
+      return request<Analytics>(`/analytics${qs}`);
+    },
   },
 
   settings: {
@@ -138,13 +147,11 @@ export const api = {
       }),
     logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
     listTokens: () =>
-      request<Array<{ id: string; name: string; created_at: string; last_used_at: string | null }>>(
-        "/auth/tokens"
-      ),
-    createToken: (name: string) =>
-      request<{ id: string; name: string; token: string; created_at: string }>("/auth/tokens", {
+      request<ApiToken[]>("/auth/tokens"),
+    createToken: (name: string, platform?: Platform) =>
+      request<{ id: string; name: string; platform: Platform; token: string; created_at: string }>("/auth/tokens", {
         method: "POST",
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, platform }),
       }),
     deleteToken: (id: string) =>
       request<{ ok: boolean }>(`/auth/tokens/${encodeURIComponent(id)}`, { method: "DELETE" }),

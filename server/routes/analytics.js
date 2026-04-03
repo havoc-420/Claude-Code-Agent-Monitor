@@ -3,13 +3,53 @@ const { stmts } = require("../db");
 
 const router = Router();
 
-router.get("/", (_req, res) => {
+const VALID_PLATFORMS = ["claude", "codebuddy"];
+
+router.get("/", (req, res) => {
+  const platform = req.query.platform;
+  const usePlatform = platform && VALID_PLATFORMS.includes(platform);
+
+  if (usePlatform) {
+    const tokenTotals = stmts.getTokenTotalsByPlatform.get(platform);
+    const toolUsage = stmts.toolUsageCountsByPlatform.all(platform);
+    const dailyEvents = stmts.dailyEventCountsByPlatform.all(platform);
+    const dailySessions = stmts.dailySessionCountsByPlatform.all(platform);
+    const agentTypes = stmts.agentTypeDistributionByPlatform.all(platform);
+    const overview = stmts.statsByPlatform.get(platform, platform, platform, platform, platform);
+    const agentsByStatus = stmts.agentStatusCountsByPlatform.all(platform);
+    const sessionsByStatus = stmts.sessionStatusCountsByPlatform.all(platform);
+    const totalSubagents = stmts.totalSubagentCountByPlatform.get(platform);
+    const eventTypes = stmts.eventTypeCountsByPlatform.all(platform);
+    const avgEvents = stmts.avgEventsPerSessionByPlatform.get(platform, platform);
+
+    return res.json({
+      tokens: {
+        total_input: tokenTotals?.total_input ?? 0,
+        total_output: tokenTotals?.total_output ?? 0,
+        total_cache_read: tokenTotals?.total_cache_read ?? 0,
+        total_cache_write: tokenTotals?.total_cache_write ?? 0,
+      },
+      tool_usage: toolUsage,
+      daily_events: dailyEvents,
+      daily_sessions: dailySessions,
+      agent_types: agentTypes,
+      event_types: eventTypes,
+      avg_events_per_session: avgEvents?.avg ?? 0,
+      total_subagents: totalSubagents?.count ?? 0,
+      overview,
+      agents_by_status: Object.fromEntries(agentsByStatus.map((r) => [r.status, r.count])),
+      sessions_by_status: Object.fromEntries(sessionsByStatus.map((r) => [r.status, r.count])),
+      platform,
+    });
+  }
+
+  // Default: all platforms
   const tokenTotals = stmts.getTokenTotals.get();
   const toolUsage = stmts.toolUsageCounts.all();
   const dailyEvents = stmts.dailyEventCounts.all();
   const dailySessions = stmts.dailySessionCounts.all();
   const agentTypes = stmts.agentTypeDistribution.all();
-  const overview = stmts.stats.get();
+  const overview = stmts.statsAll.get();
   const agentsByStatus = stmts.agentStatusCounts.all();
   const sessionsByStatus = stmts.sessionStatusCounts.all();
   const totalSubagents = stmts.totalSubagentCount.get();

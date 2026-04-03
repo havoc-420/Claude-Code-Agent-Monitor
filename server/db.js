@@ -277,6 +277,27 @@ if (agentsOldExists || !agentsTableSql.includes("awaiting_approval")) {
   db.pragma("foreign_keys = ON");
 }
 
+// Migrate: add platform column to api_tokens (claude | codebuddy)
+try {
+  db.prepare("SELECT platform FROM api_tokens LIMIT 1").get();
+} catch {
+  db.prepare("ALTER TABLE api_tokens ADD COLUMN platform TEXT NOT NULL DEFAULT 'claude'").run();
+}
+
+// Migrate: add platform column to sessions (claude | codebuddy)
+// Platform is derived from the API token used to create/register the session.
+try {
+  db.prepare("SELECT platform FROM sessions LIMIT 1").get();
+} catch {
+  db.prepare("ALTER TABLE sessions ADD COLUMN platform TEXT NOT NULL DEFAULT 'claude'").run();
+}
+// Ensure the platform index exists (for fresh DBs or upgraded ones)
+try {
+  db.exec("CREATE INDEX IF NOT EXISTS idx_sessions_platform ON sessions(platform)");
+} catch {
+  // Ignore if already exists or column not yet available
+}
+
 // Startup cleanup: mark stale active sessions as completed.
 // Legacy sessions (created before SessionEnd hook) will never receive a SessionEnd event,
 // so they stay "active" forever. Complete any active session whose last event is older than
@@ -320,7 +341,7 @@ const stmts = {
      WHERE s.status = ? GROUP BY s.id ORDER BY s.updated_at DESC LIMIT ? OFFSET ?`
   ),
   insertSession: db.prepare(
-    "INSERT INTO sessions (id, name, status, cwd, model, token_name, started_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?)"
+    "INSERT INTO sessions (id, name, status, cwd, model, token_name, platform, started_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?)"
   ),
   updateSession: db.prepare(
     "UPDATE sessions SET name = COALESCE(?, name), status = COALESCE(?, status), ended_at = COALESCE(?, ended_at), metadata = COALESCE(?, metadata), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
@@ -495,6 +516,109 @@ const stmts = {
     FROM events
   `),
 
+  // Platform-filtered queries
+  statsByPlatform: db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM sessions WHERE platform = ?) as total_sessions,
+      (SELECT COUNT(*) FROM sessions WHERE platform = ? AND status = 'active') as active_sessions,
+      (SELECT COUNT(*) FROM agents WHERE status IN ('working', 'connected', 'idle') AND session_id IN (SELECT id FROM sessions WHERE platform = ?)) as active_agents,
+      (SELECT COUNT(*) FROM agents WHERE session_id IN (SELECT id FROM sessions WHERE platform = ?)) as total_agents,
+      (SELECT COUNT(*) FROM events WHERE session_id IN (SELECT id FROM sessions WHERE platform = ?)) as total_events
+  `),
+  agentStatusCountsByPlatform: db.prepare(`
+    SELECT a.status, COUNT(*) as count FROM agents a
+    JOIN sessions s ON s.id = a.session_id
+    WHERE s.platform = ?
+    GROUP BY a.status
+  `),
+  sessionStatusCountsByPlatform: db.prepare(`
+    SELECT status, COUNT(*) as count FROM sessions WHERE platform = ? GROUP BY status
+  `),
+  listSessionsByPlatform: db.prepare(
+    `SELECT s.*, COUNT(a.id) as agent_count, s.updated_at as last_activity
+     FROM sessions s LEFT JOIN agents a ON a.session_id = s.id
+     WHERE s.platform = ? GROUP BY s.id ORDER BY s.updated_at DESC LIMIT ? OFFSET ?`
+  ),
+  listSessionsByPlatformAndStatus: db.prepare(
+    `SELECT s.*, COUNT(a.id) as agent_count, s.updated_at as last_activity
+     FROM sessions s LEFT JOIN agents a ON a.session_id = s.id
+     WHERE s.platform = ? AND s.status = ? GROUP BY s.id ORDER BY s.updated_at DESC LIMIT ? OFFSET ?`
+  ),
+  dailyEventCountsByPlatform: db.prepare(`
+    SELECT DATE(e.created_at) as date, COUNT(*) as count
+    FROM events e
+    JOIN sessions s ON s.id = e.session_id
+    WHERE e.created_at >= DATE('now', '-365 days') AND s.platform = ?
+    GROUP BY DATE(e.created_at)
+    ORDER BY date ASC
+  `),
+  dailySessionCountsByPlatform: db.prepare(`
+    SELECT DATE(started_at) as date, COUNT(*) as count
+    FROM sessions
+    WHERE started_at >= DATE('now', '-365 days') AND platform = ?
+    GROUP BY DATE(started_at)
+    ORDER BY date ASC
+  `),
+  toolUsageCountsByPlatform: db.prepare(`
+    SELECT e.tool_name, COUNT(*) as count
+    FROM events e
+    JOIN sessions s ON s.id = e.session_id
+    WHERE e.tool_name IS NOT NULL AND s.platform = ?
+    GROUP BY e.tool_name
+    ORDER BY count DESC
+    LIMIT 20
+  `),
+  eventTypeCountsByPlatform: db.prepare(`
+    SELECT e.event_type, COUNT(*) as count
+    FROM events e
+    JOIN sessions s ON s.id = e.session_id
+    WHERE s.platform = ?
+    GROUP BY e.event_type
+    ORDER BY count DESC
+  `),
+  avgEventsPerSessionByPlatform: db.prepare(`
+    SELECT ROUND(CAST(COUNT(*) AS REAL) / MAX(1, (SELECT COUNT(*) FROM sessions WHERE platform = ?)), 1) as avg
+    FROM events e
+    JOIN sessions s ON s.id = e.session_id
+    WHERE s.platform = ?
+  `),
+  totalSubagentCountByPlatform: db.prepare(`
+    SELECT COUNT(*) as count FROM agents
+    WHERE type = 'subagent' AND session_id IN (SELECT id FROM sessions WHERE platform = ?)
+  `),
+  agentTypeDistributionByPlatform: db.prepare(`
+    SELECT a.subagent_type, COUNT(*) as count
+    FROM agents a
+    JOIN sessions s ON s.id = a.session_id
+    WHERE a.type = 'subagent' AND a.subagent_type IS NOT NULL AND s.platform = ?
+    GROUP BY a.subagent_type
+    ORDER BY count DESC
+  `),
+  getTokenTotalsByPlatform: db.prepare(`
+    SELECT
+      COALESCE(SUM(t.input_tokens + t.baseline_input), 0) as total_input,
+      COALESCE(SUM(t.output_tokens + t.baseline_output), 0) as total_output,
+      COALESCE(SUM(t.cache_read_tokens + t.baseline_cache_read), 0) as total_cache_read,
+      COALESCE(SUM(t.cache_write_tokens + t.baseline_cache_write), 0) as total_cache_write
+    FROM token_usage t
+    JOIN sessions s ON s.id = t.session_id
+    WHERE s.platform = ?
+  `),
+  countEventsTodayByPlatform: db.prepare(`
+    SELECT COUNT(*) as count FROM events e
+    JOIN sessions s ON s.id = e.session_id
+    WHERE e.created_at >= strftime('%Y-%m-%dT00:00:00.000Z', 'now', 'start of day')
+      AND s.platform = ?
+  `),
+  statsAll: db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM sessions) as total_sessions,
+      (SELECT COUNT(*) FROM sessions WHERE status = 'active') as active_sessions,
+      (SELECT COUNT(*) FROM agents WHERE status IN ('working', 'connected', 'idle')) as active_agents,
+      (SELECT COUNT(*) FROM agents) as total_agents,
+      (SELECT COUNT(*) FROM events) as total_events
+  `),
+
   // IP whitelist (auth sessions)
   insertOrReplaceIP: db.prepare(
     "INSERT OR REPLACE INTO ip_whitelist (ip, expires_at) VALUES (?, ?)"
@@ -509,11 +633,11 @@ const stmts = {
 
   // API tokens
   listTokens: db.prepare(
-    "SELECT id, name, created_at, last_used_at FROM api_tokens ORDER BY created_at DESC"
+    "SELECT id, name, platform, created_at, last_used_at FROM api_tokens ORDER BY created_at DESC"
   ),
   getTokenByValue: db.prepare("SELECT * FROM api_tokens WHERE token = ?"),
   insertToken: db.prepare(
-    "INSERT INTO api_tokens (id, name, token) VALUES (?, ?, ?)"
+    "INSERT INTO api_tokens (id, name, platform, token) VALUES (?, ?, ?, ?)"
   ),
   deleteToken: db.prepare("DELETE FROM api_tokens WHERE id = ?"),
   touchTokenLastUsed: db.prepare(

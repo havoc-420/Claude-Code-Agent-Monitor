@@ -76,22 +76,27 @@ router.get("/tokens", (req, res) => {
  * This is the ONLY time the raw token value is returned.
  */
 router.post("/tokens", (req, res) => {
-  const { name } = req.body || {};
+  const { name, platform } = req.body || {};
   if (!name || typeof name !== "string" || !name.trim()) {
     return res.status(400).json({ error: "name is required" });
   }
+
+  // Validate platform — must be 'claude' or 'codebuddy'
+  const validPlatforms = ["claude", "codebuddy"];
+  const resolvedPlatform = validPlatforms.includes(platform) ? platform : "claude";
 
   const id = uuidv4();
   const token = "dm_" + randomBytes(32).toString("hex");
   const trimmedName = name.trim().slice(0, 100);
 
-  stmts.insertToken.run(id, trimmedName, token);
+  stmts.insertToken.run(id, trimmedName, resolvedPlatform, token);
 
   // Fetch to get created_at from DB
   const row = stmts.getTokenByValue.get(token);
   return res.status(201).json({
     id: row.id,
     name: row.name,
+    platform: row.platform,
     token: row.token,
     created_at: row.created_at,
   });

@@ -8,6 +8,7 @@ export interface Session {
   status: SessionStatus;
   cwd: string | null;
   model: string | null;
+  platform: string;
   started_at: string;
   ended_at: string | null;
   metadata: string | null;
@@ -336,5 +337,33 @@ export const SESSION_STATUS_CONFIG: Record<
     label: "Abandoned",
     color: "text-yellow-400",
     bg: "bg-yellow-500/10 border-yellow-500/20",
+  },
+};
+
+export type Platform = "claude" | "codebuddy";
+
+export interface ApiToken {
+  id: string;
+  name: string;
+  platform: Platform;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export const PLATFORM_CONFIG: Record<
+  Platform,
+  { label: string; color: string; bg: string; dot: string }
+> = {
+  claude: {
+    label: "Claude",
+    color: "text-blue-400",
+    bg: "bg-blue-500/10 border-blue-500/20",
+    dot: "bg-blue-400",
+  },
+  codebuddy: {
+    label: "CodeBuddy",
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/10 border-cyan-500/20",
+    dot: "bg-cyan-400",
   },
 };
