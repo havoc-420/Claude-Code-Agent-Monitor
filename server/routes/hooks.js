@@ -524,6 +524,9 @@ router.get("/setup-info", (req, res) => {
     ? `,"hook_api_key":"${hookToken}"`
     : "";
 
+  // Query-string token for authenticated downloads (handler.js, install-hooks.js)
+  const tokenQs = hookToken ? `?token=${hookToken}` : "";
+
   // Build the one-liner shell script
   // Downloads both scripts from the server, then runs install-hooks.js with correct args.
   // No inline Node.js code — avoids escaping nightmares.
@@ -569,11 +572,11 @@ fi
 # 1. Download scripts
 mkdir -p "$HANDLER_DIR"
 echo "Downloading scripts from ${dashboardUrl}..."
-curl -sf "${dashboardUrl}/api/hooks/handler.js" -o "$HANDLER_FILE" || {
+curl -sf "${dashboardUrl}/api/hooks/handler.js${tokenQs}" -o "$HANDLER_FILE" || {
   echo "ERROR: Failed to download hook-handler.js"
   exit 1
 }
-curl -sf "${dashboardUrl}/api/hooks/install-hooks.js" -o "$INSTALLER_FILE" || {
+curl -sf "${dashboardUrl}/api/hooks/install-hooks.js${tokenQs}" -o "$INSTALLER_FILE" || {
   echo "ERROR: Failed to download install-hooks.js"
   exit 1
 }
