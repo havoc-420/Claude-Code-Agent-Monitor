@@ -83,13 +83,13 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
       </div>
 
       {agent.task && (
-        <p className="text-xs text-gray-400 mb-2 line-clamp-2 leading-relaxed">{agent.task}</p>
+        <p className="text-xs text-gray-400 mb-2 truncate">{agent.task}</p>
       )}
 
       {agent.last_event_summary && (
         <div className="flex items-start gap-1.5 mb-3 text-[11px] text-gray-500 bg-surface-2 rounded-md px-2.5 py-1.5">
           <Sparkles className="w-3 h-3 flex-shrink-0 mt-0.5 text-violet-400/70" />
-          <span className="line-clamp-2 leading-relaxed">{agent.last_event_summary}</span>
+          <span className="truncate">{agent.last_event_summary}</span>
         </div>
       )}
 

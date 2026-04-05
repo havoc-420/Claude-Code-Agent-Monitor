@@ -8,7 +8,7 @@ import { STATUS_CONFIG } from "../lib/types";
 import type { Agent, AgentStatus } from "../lib/types";
 
 const COLUMNS: AgentStatus[] = ["awaiting_approval", "idle", "working", "connected", "error", "completed"];
-const COLUMN_PAGE_SIZE = 10;
+const COLUMN_PAGE_SIZE = 5;
 
 export function KanbanBoard() {
   const [agents, setAgents] = useState<Agent[]>([]);

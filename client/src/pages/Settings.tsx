@@ -199,6 +199,8 @@ export function Settings() {
   const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>(loadNotifPrefs);
   const [abandonHours, setAbandonHours] = useState("24");
   const [purgeDays, setPurgeDays] = useState("90");
+  const [pricingPage, setPricingPage] = useState(1);
+  const PRICING_PAGE_SIZE = 5;
 
   // ─── Token management state ───
   interface ApiToken {
@@ -667,141 +669,6 @@ export function Settings() {
         </div>
       </div>
 
-      {/* ─── MODEL PRICING ─── */}
-      <section>
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div>
-            <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-gray-500" />
-              Model Pricing
-            </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Rates per million tokens (USD). Use <code className="text-gray-400">%</code> as
-              wildcard in patterns.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() =>
-                confirmAction === "reset-pricing"
-                  ? handleResetPricing()
-                  : setConfirmAction("reset-pricing")
-              }
-              disabled={isEditing || actionLoading !== null}
-              className={`text-xs px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 ${
-                confirmAction === "reset-pricing"
-                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                  : "text-gray-400 hover:text-gray-300 hover:bg-surface-4"
-              }`}
-            >
-              <RotateCcw className="w-3 h-3 inline mr-1" />
-              {confirmAction === "reset-pricing" ? "Confirm Reset" : "Reset Defaults"}
-            </button>
-            <button
-              onClick={startAdd}
-              disabled={isEditing}
-              className="btn-primary text-xs disabled:opacity-50"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add Model
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-4 px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
-            {error}
-          </div>
-        )}
-
-        {actionBanner(["reset-pricing"])}
-
-        <div className="card overflow-x-auto mt-4">
-          <table className="w-full min-w-[700px]">
-            <thead>
-              <tr className="border-b border-border text-left">
-                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                  Pattern
-                </th>
-                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                  Display Name
-                </th>
-                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">
-                  Input
-                </th>
-                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">
-                  Output
-                </th>
-                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">
-                  Cache Read
-                </th>
-                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">
-                  Cache Write
-                </th>
-                <th className="w-24 px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {pricing.map((rule) =>
-                editingPattern === rule.model_pattern ? (
-                  <tr key={rule.model_pattern} className="bg-surface-3">
-                    {renderEditCells()}
-                  </tr>
-                ) : (
-                  <tr
-                    key={rule.model_pattern}
-                    className="hover:bg-surface-4 transition-colors group"
-                  >
-                    <td className="px-4 py-3 text-sm font-mono text-gray-300">
-                      {rule.model_pattern}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-300">{rule.display_name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-400 text-right font-mono">
-                      ${rule.input_per_mtok}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-400 text-right font-mono">
-                      ${rule.output_per_mtok}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-400 text-right font-mono">
-                      ${rule.cache_read_per_mtok}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-400 text-right font-mono">
-                      ${rule.cache_write_per_mtok}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => startEdit(rule)}
-                          disabled={isEditing}
-                          className="p-1.5 rounded-md text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-30"
-                          title="Edit"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => deleteRule(rule.model_pattern)}
-                          disabled={isEditing}
-                          className="p-1.5 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              )}
-              {adding && <tr className="bg-surface-3">{renderEditCells()}</tr>}
-            </tbody>
-          </table>
-        </div>
-
-        {lastUpdated && (
-          <p className="text-xs text-gray-600 mt-3">Last updated: {formatTimestamp(lastUpdated)}</p>
-        )}
-      </section>
-
       {/* ─── HOOK CONFIGURATION ─── */}
       <section>
         <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
@@ -860,6 +727,175 @@ export function Settings() {
               </div>
               <p className="text-[11px] text-gray-600 font-mono truncate">{sysInfo.hooks.path}</p>
             </>
+          )}
+        </div>
+      </section>
+
+      {/* ─── API TOKENS ─── */}
+      <section>
+        <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
+          <Key className="w-4 h-4 text-gray-500" />
+          API Tokens
+        </h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Named tokens for hook-handler and API callers. Only shown once at creation.
+          Requires <code className="font-mono bg-surface-4 px-1 rounded">DASHBOARD_ADMIN_PASSWORD</code> to be set.
+        </p>
+
+        <div className="card p-5 space-y-4">
+          {/* New token form */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newTokenName}
+              onChange={(e) => setNewTokenName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleCreateToken(); }}
+              placeholder="Token name (e.g. CI server)"
+              className="input flex-1 text-sm"
+              disabled={creatingToken}
+            />
+            <div className="flex gap-0.5 bg-surface-2 rounded-lg p-0.5 flex-shrink-0">
+              {([
+                { label: "Claude", value: "claude" as Platform, dot: "bg-blue-400" },
+                { label: "CodeBuddy", value: "codebuddy" as Platform, dot: "bg-cyan-400" },
+              ]).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setNewTokenPlatform(opt.value)}
+                  disabled={creatingToken}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 ${
+                    newTokenPlatform === opt.value
+                      ? "bg-surface-4 text-gray-200 shadow-sm"
+                      : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${opt.dot}`} />
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleCreateToken}
+              disabled={creatingToken || !newTokenName.trim()}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {creatingToken ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
+              Generate
+            </button>
+          </div>
+
+          {/* Newly created token reveal */}
+          {newlyCreatedToken && (
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 space-y-3">
+              <p className="text-xs text-emerald-400 font-medium">
+                Token created: <span className="text-gray-200">{newlyCreatedToken.name}</span>
+                <span className={`ml-1.5 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${PLATFORM_CONFIG[newlyCreatedToken.platform].bg} ${PLATFORM_CONFIG[newlyCreatedToken.platform].color}`}>
+                  {PLATFORM_CONFIG[newlyCreatedToken.platform].label}
+                </span>
+                — copy it now, it will not be shown again.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs font-mono bg-surface-1 border border-border rounded px-3 py-2 text-gray-200 break-all">
+                  {newlyCreatedToken.token}
+                </code>
+                <button
+                  onClick={handleCopyToken}
+                  className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-2 rounded-md bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors"
+                >
+                  {tokenCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {tokenCopied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  onClick={() => setNewlyCreatedToken(null)}
+                  className="flex-shrink-0 text-gray-500 hover:text-gray-300 transition-colors p-1"
+                  title="Dismiss"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* One-liner setup command */}
+              <div>
+                <p className="text-xs text-gray-400 mb-1.5">Run on target machine to connect {PLATFORM_CONFIG[newlyCreatedToken.platform].label}:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs font-mono bg-surface-1 border border-border rounded px-3 py-2 text-blue-300 break-all select-all">
+                    curl -s &quot;{window.location.origin}/api/hooks/setup-info?token={newlyCreatedToken.token}&quot; | sh
+                  </code>
+                  <button
+                    onClick={handleCopySetupCmd}
+                    className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-2 rounded-md bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors"
+                  >
+                    {setupCmdCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {setupCmdCopied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Token list */}
+          {tokensLoading ? (
+            <p className="text-xs text-gray-500">Loading tokens…</p>
+          ) : tokens.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              No tokens yet. Generate one above, or auth may be disabled.
+            </p>
+          ) : (
+            <div className="divide-y divide-border">
+              {tokens.map((tok) => (
+                <div key={tok.id} className="flex items-center justify-between py-3 gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-gray-200 truncate">{tok.name}</p>
+                      <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border flex-shrink-0 ${PLATFORM_CONFIG[tok.platform].bg} ${PLATFORM_CONFIG[tok.platform].color}`}>
+                        {PLATFORM_CONFIG[tok.platform].label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Created {formatTimestamp(tok.created_at)}
+                      {tok.last_used_at && (
+                        <span> · Last used {formatTimestamp(tok.last_used_at)}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {confirmRevokeId === tok.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleRevokeToken(tok.id)}
+                          disabled={revokingTokenId === tok.id}
+                          className="text-xs px-2.5 py-1 rounded-md bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                        >
+                          {revokingTokenId === tok.id ? (
+                            <RefreshCw className="w-3 h-3 animate-spin inline" />
+                          ) : (
+                            "Revoke"
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setConfirmRevokeId(null)}
+                          className="text-xs px-2 py-1 rounded-md text-gray-400 hover:bg-surface-4 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmRevokeId(tok.id)}
+                        className="text-xs px-2.5 py-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </section>
@@ -1225,173 +1261,119 @@ export function Settings() {
         </div>
       </section>
 
-      {/* ─── API TOKENS ─── */}
+      {/* ─── MODEL PRICING ─── */}
       <section>
-        <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
-          <Key className="w-4 h-4 text-gray-500" />
-          API Tokens
-        </h3>
-        <p className="text-xs text-gray-500 mb-4">
-          Named tokens for hook-handler and API callers. Only shown once at creation.
-          Requires <code className="font-mono bg-surface-4 px-1 rounded">DASHBOARD_ADMIN_PASSWORD</code> to be set.
-        </p>
-
-        <div className="card p-5 space-y-4">
-          {/* New token form */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-gray-500" />
+              Model Pricing
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Rates per million tokens (USD). Use <code className="text-gray-400">%</code> as
+              wildcard in patterns.
+            </p>
+          </div>
           <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newTokenName}
-              onChange={(e) => setNewTokenName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleCreateToken(); }}
-              placeholder="Token name (e.g. CI server)"
-              className="input flex-1 text-sm"
-              disabled={creatingToken}
-            />
-            <div className="flex gap-0.5 bg-surface-2 rounded-lg p-0.5 flex-shrink-0">
-              {([
-                { label: "Claude", value: "claude" as Platform, dot: "bg-blue-400" },
-                { label: "CodeBuddy", value: "codebuddy" as Platform, dot: "bg-cyan-400" },
-              ]).map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setNewTokenPlatform(opt.value)}
-                  disabled={creatingToken}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 ${
-                    newTokenPlatform === opt.value
-                      ? "bg-surface-4 text-gray-200 shadow-sm"
-                      : "text-gray-500 hover:text-gray-300"
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${opt.dot}`} />
-                  {opt.label}
-                </button>
-              ))}
-            </div>
             <button
-              onClick={handleCreateToken}
-              disabled={creatingToken || !newTokenName.trim()}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() =>
+                confirmAction === "reset-pricing"
+                  ? handleResetPricing()
+                  : setConfirmAction("reset-pricing")
+              }
+              disabled={isEditing || actionLoading !== null}
+              className={`text-xs px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 ${
+                confirmAction === "reset-pricing"
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  : "text-gray-400 hover:text-gray-300 hover:bg-surface-4"
+              }`}
             >
-              {creatingToken ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Plus className="w-3.5 h-3.5" />
-              )}
-              Generate
+              <RotateCcw className="w-3 h-3 inline mr-1" />
+              {confirmAction === "reset-pricing" ? "Confirm Reset" : "Reset Defaults"}
+            </button>
+            <button
+              onClick={startAdd}
+              disabled={isEditing}
+              className="btn-primary text-xs disabled:opacity-50"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Model
             </button>
           </div>
-
-          {/* Newly created token reveal */}
-          {newlyCreatedToken && (
-            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 space-y-3">
-              <p className="text-xs text-emerald-400 font-medium">
-                Token created: <span className="text-gray-200">{newlyCreatedToken.name}</span>
-                <span className={`ml-1.5 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${PLATFORM_CONFIG[newlyCreatedToken.platform].bg} ${PLATFORM_CONFIG[newlyCreatedToken.platform].color}`}>
-                  {PLATFORM_CONFIG[newlyCreatedToken.platform].label}
-                </span>
-                — copy it now, it will not be shown again.
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs font-mono bg-surface-1 border border-border rounded px-3 py-2 text-gray-200 break-all">
-                  {newlyCreatedToken.token}
-                </code>
-                <button
-                  onClick={handleCopyToken}
-                  className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-2 rounded-md bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors"
-                >
-                  {tokenCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  {tokenCopied ? "Copied" : "Copy"}
-                </button>
-                <button
-                  onClick={() => setNewlyCreatedToken(null)}
-                  className="flex-shrink-0 text-gray-500 hover:text-gray-300 transition-colors p-1"
-                  title="Dismiss"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* One-liner setup command */}
-              <div>
-                <p className="text-xs text-gray-400 mb-1.5">Run on target machine to connect {PLATFORM_CONFIG[newlyCreatedToken.platform].label}:</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 text-xs font-mono bg-surface-1 border border-border rounded px-3 py-2 text-blue-300 break-all select-all">
-                    curl -s &quot;{window.location.origin}/api/hooks/setup-info?token={newlyCreatedToken.token}&quot; | sh
-                  </code>
-                  <button
-                    onClick={handleCopySetupCmd}
-                    className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-2 rounded-md bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors"
-                  >
-                    {setupCmdCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    {setupCmdCopied ? "Copied" : "Copy"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Token list */}
-          {tokensLoading ? (
-            <p className="text-xs text-gray-500">Loading tokens…</p>
-          ) : tokens.length === 0 ? (
-            <p className="text-xs text-gray-500">
-              No tokens yet. Generate one above, or auth may be disabled.
-            </p>
-          ) : (
-            <div className="divide-y divide-border">
-              {tokens.map((tok) => (
-                <div key={tok.id} className="flex items-center justify-between py-3 gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-gray-200 truncate">{tok.name}</p>
-                      <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border flex-shrink-0 ${PLATFORM_CONFIG[tok.platform].bg} ${PLATFORM_CONFIG[tok.platform].color}`}>
-                        {PLATFORM_CONFIG[tok.platform].label}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Created {formatTimestamp(tok.created_at)}
-                      {tok.last_used_at && (
-                        <span> · Last used {formatTimestamp(tok.last_used_at)}</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    {confirmRevokeId === tok.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleRevokeToken(tok.id)}
-                          disabled={revokingTokenId === tok.id}
-                          className="text-xs px-2.5 py-1 rounded-md bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50"
-                        >
-                          {revokingTokenId === tok.id ? (
-                            <RefreshCw className="w-3 h-3 animate-spin inline" />
-                          ) : (
-                            "Revoke"
-                          )}
-                        </button>
-                        <button
-                          onClick={() => setConfirmRevokeId(null)}
-                          className="text-xs px-2 py-1 rounded-md text-gray-400 hover:bg-surface-4 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmRevokeId(tok.id)}
-                        className="text-xs px-2.5 py-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
+
+        {error && (
+          <div className="mb-4 px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
+        {actionBanner(["reset-pricing"])}
+
+        <div className="card overflow-x-auto mt-4">
+          <table className="w-full min-w-[700px]">
+            <thead>
+              <tr className="border-b border-border text-left">
+                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Pattern</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Display Name</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Input</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Output</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Cache Read</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Cache Write</th>
+                <th className="w-24 px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {(() => {
+                const totalPages = Math.max(1, Math.ceil(pricing.length / PRICING_PAGE_SIZE));
+                const safePage = Math.min(pricingPage, totalPages);
+                const paged = pricing.slice((safePage - 1) * PRICING_PAGE_SIZE, safePage * PRICING_PAGE_SIZE);
+                return (
+                  <>
+                    {paged.map((rule) =>
+                      editingPattern === rule.model_pattern ? (
+                        <tr key={rule.model_pattern} className="bg-surface-3">{renderEditCells()}</tr>
+                      ) : (
+                        <tr key={rule.model_pattern} className="hover:bg-surface-4 transition-colors group">
+                          <td className="px-4 py-3 text-sm font-mono text-gray-300">{rule.model_pattern}</td>
+                          <td className="px-4 py-3 text-sm text-gray-300">{rule.display_name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-400 text-right font-mono">${rule.input_per_mtok}</td>
+                          <td className="px-4 py-3 text-sm text-gray-400 text-right font-mono">${rule.output_per_mtok}</td>
+                          <td className="px-4 py-3 text-sm text-gray-400 text-right font-mono">${rule.cache_read_per_mtok}</td>
+                          <td className="px-4 py-3 text-sm text-gray-400 text-right font-mono">${rule.cache_write_per_mtok}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => startEdit(rule)} disabled={isEditing} className="p-1.5 rounded-md text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-30" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => deleteRule(rule.model_pattern)} disabled={isEditing} className="p-1.5 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    )}
+                    {adding && <tr className="bg-surface-3">{renderEditCells()}</tr>}
+                    {totalPages > 1 && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-3">
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>{(safePage - 1) * PRICING_PAGE_SIZE + 1}–{Math.min(safePage * PRICING_PAGE_SIZE, pricing.length)} of {pricing.length}</span>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setPricingPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1} className="px-2 py-1 rounded border border-border text-gray-500 hover:text-gray-300 hover:bg-surface-3 disabled:opacity-40">Prev</button>
+                              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                                <button key={p} onClick={() => setPricingPage(p)} className={`w-7 h-7 rounded border transition-colors ${p === safePage ? "border-accent/30 bg-accent/10 text-accent" : "border-border text-gray-500 hover:text-gray-300 hover:bg-surface-3"}`}>{p}</button>
+                              ))}
+                              <button onClick={() => setPricingPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} className="px-2 py-1 rounded border border-border text-gray-500 hover:text-gray-300 hover:bg-surface-3 disabled:opacity-40">Next</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })()}
+            </tbody>
+          </table>
+        </div>
+
+        {lastUpdated && (<p className="text-xs text-gray-600 mt-3">Last updated: {formatTimestamp(lastUpdated)}</p>)}
       </section>
 
       {/* ─── ABOUT ─── */}

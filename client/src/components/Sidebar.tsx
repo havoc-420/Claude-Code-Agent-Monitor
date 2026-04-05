@@ -9,8 +9,6 @@ import {
   Settings,
   Wifi,
   WifiOff,
-  Github,
-  Globe,
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
@@ -138,7 +136,7 @@ export function Sidebar({ wsConnected, collapsed, onToggle }: SidebarProps) {
 
       {/* Footer */}
       <div
-        className={`px-3 py-3 border-t border-border space-y-2 ${collapsed ? "items-center" : ""}`}
+        className={`px-3 py-3 border-t border-border ${collapsed ? "items-center" : ""}`}
       >
         <div className={`flex items-center text-xs ${collapsed ? "justify-center" : "gap-2"}`}>
           {wsConnected ? (
@@ -154,51 +152,6 @@ export function Sidebar({ wsConnected, collapsed, onToggle }: SidebarProps) {
           )}
           {!collapsed && <span className="ml-auto text-gray-600">v1.0.0</span>}
         </div>
-        {!collapsed && (
-          <div className="flex items-center gap-3">
-            <a
-              href="https://github.com/hoangsonww"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-500 hover:text-gray-300 transition-colors"
-              title="GitHub"
-            >
-              <Github className="w-3.5 h-3.5" />
-            </a>
-            <a
-              href="https://sonnguyenhoang.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1 text-[11px]"
-              title="sonnguyenhoang.com"
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>sonnguyenhoang.com</span>
-            </a>
-          </div>
-        )}
-        {collapsed && (
-          <div className="flex justify-center gap-2">
-            <a
-              href="https://github.com/hoangsonww"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-500 hover:text-gray-300 transition-colors"
-              title="GitHub"
-            >
-              <Github className="w-3.5 h-3.5" />
-            </a>
-            <a
-              href="https://sonnguyenhoang.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-500 hover:text-gray-300 transition-colors"
-              title="sonnguyenhoang.com"
-            >
-              <Globe className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        )}
       </div>
     </aside>
   );
