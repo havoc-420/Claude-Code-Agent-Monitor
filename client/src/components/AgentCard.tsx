@@ -1,9 +1,8 @@
 import { Bot, GitBranch, Clock, Wrench, Tag, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AgentStatusBadge } from "./StatusBadge";
-import type { Agent, Platform } from "../lib/types";
+import type { Agent } from "../lib/types";
 import { formatDuration, timeAgo } from "../lib/format";
-import { PLATFORM_CONFIG } from "../lib/types";
 
 const platformDotMap: Record<string, string> = {
   claude: "bg-blue-400",
