@@ -54,6 +54,9 @@ function createAuthMiddleware() {
   return (req, res, next) => {
     const { method, path } = req;
 
+    // Non-API paths — skip auth so static assets and SPA catch-all can serve them
+    if (!path.startsWith("/api/")) return next();
+
     // Health check — always allow
     if (path === "/api/health") return next();
 

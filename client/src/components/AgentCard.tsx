@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Bot, GitBranch, Clock, Wrench, Tag, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AgentStatusBadge } from "./StatusBadge";
@@ -12,12 +13,50 @@ const platformDotMap: Record<string, string> = {
 interface AgentCardProps {
   agent: Agent;
   onClick?: () => void;
+  hideStatus?: boolean;
 }
 
-export function AgentCard({ agent, onClick }: AgentCardProps) {
+export function AgentCard({ agent, onClick, hideStatus = false }: AgentCardProps) {
   const navigate = useNavigate();
+  const [tagsExpanded, setTagsExpanded] = useState(false);
   const isWorking = agent.status === "working" || agent.status === "connected" || agent.status === "awaiting_approval";
   const isWaiting = agent.status === "idle" && agent.type === "main";
+
+  // Build ordered tag list: platform first, then token_name
+  const tags: { key: string; node: React.ReactNode }[] = [];
+  if (agent.platform) {
+    tags.push({
+      key: "platform",
+      node: (
+        <span
+          className={`inline-flex items-center gap-0.5 text-[10px] border px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+            agent.platform === "claude"
+              ? "text-blue-400 bg-blue-500/10 border-blue-500/20"
+              : "text-cyan-400 bg-cyan-500/10 border-cyan-500/20"
+          }`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${platformDotMap[agent.platform] ?? "bg-gray-400"}`} />
+          {agent.platform === "claude" ? "Claude" : "CodeBuddy"}
+        </span>
+      ),
+    });
+  }
+  if (agent.token_name) {
+    tags.push({
+      key: "token",
+      node: (
+        <span className="inline-flex items-center gap-0.5 text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full flex-shrink-0">
+          <Tag className="w-2.5 h-2.5" />
+          {agent.token_name}
+        </span>
+      ),
+    });
+  }
+
+  // How many tags to show before collapsing
+  const VISIBLE_COUNT = 2;
+  const hiddenCount = tags.length - VISIBLE_COUNT;
+  const visibleTags = tagsExpanded ? tags : tags.slice(0, VISIBLE_COUNT);
 
   function handleClick() {
     if (onClick) {
@@ -53,33 +92,29 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
             <p className="text-sm font-medium text-gray-200 truncate">
               {agent.session_cwd ? agent.session_cwd.split("/").pop() : agent.name}
             </p>
-            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-              <span className="text-[11px] text-gray-500 truncate">
-                {agent.name}{agent.subagent_type ? ` · ${agent.subagent_type}` : ""}
-              </span>
-              {agent.platform && (
-                <span
-                  className={`inline-flex items-center gap-0.5 text-[10px] border px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                    agent.platform === "claude"
-                      ? "text-blue-400 bg-blue-500/10 border-blue-500/20"
-                      : "text-cyan-400 bg-cyan-500/10 border-cyan-500/20"
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${platformDotMap[agent.platform] ?? "bg-gray-400"}`} />
-                  {agent.platform === "claude" ? "Claude" : "CodeBuddy"}
-                </span>
-              )}
-              {agent.token_name && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                  <Tag className="w-2.5 h-2.5" />
-                  {agent.token_name}
-                </span>
-              )}
-            </div>
+            <p className="text-[11px] text-gray-500 truncate">
+              {agent.name}{agent.subagent_type ? ` · ${agent.subagent_type}` : ""}
+            </p>
           </div>
         </div>
-        <AgentStatusBadge status={agent.status} />
+        {!hideStatus && <AgentStatusBadge status={agent.status} />}
       </div>
+
+      {tags.length > 0 && (
+        <div className="flex items-center gap-1.5 mb-3 overflow-hidden">
+          {visibleTags.map((t) => (
+            <span key={t.key}>{t.node}</span>
+          ))}
+          {!tagsExpanded && hiddenCount > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setTagsExpanded(true); }}
+              className="inline-flex items-center text-[10px] text-gray-500 hover:text-gray-300 bg-surface-3 border border-border px-1.5 py-0.5 rounded-full flex-shrink-0 transition-colors"
+            >
+              +{hiddenCount}
+            </button>
+          )}
+        </div>
+      )}
 
       {agent.task && (
         <p className="text-xs text-gray-400 mb-2 truncate">{agent.task}</p>

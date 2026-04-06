@@ -116,7 +116,7 @@ export function KanbanBoard() {
                 {items && items.length > 0 ? (
                   <>
                     {items.slice(0, expanded[status] || COLUMN_PAGE_SIZE).map((agent) => (
-                      <AgentCard key={agent.id} agent={agent} />
+                      <AgentCard key={agent.id} agent={agent} hideStatus />
                     ))}
                     {items.length > (expanded[status] || COLUMN_PAGE_SIZE) && (
                       <button
