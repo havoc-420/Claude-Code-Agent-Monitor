@@ -14,13 +14,41 @@ interface AgentCardProps {
   agent: Agent;
   onClick?: () => void;
   hideStatus?: boolean;
+  compact?: boolean;
+  showSubStatus?: boolean;
 }
 
-export function AgentCard({ agent, onClick, hideStatus = false }: AgentCardProps) {
+export function AgentCard({ agent, onClick, hideStatus = false, compact = false, showSubStatus = false }: AgentCardProps) {
   const navigate = useNavigate();
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const isWorking = agent.status === "working" || agent.status === "connected" || agent.status === "awaiting_approval";
   const isWaiting = agent.status === "idle" && agent.type === "main";
+
+  if (compact) {
+    return (
+      <div
+        onClick={onClick ?? (() => navigate(`/sessions/${agent.session_id}`))}
+        className="card-hover p-2.5 cursor-pointer animate-fade-in overflow-hidden"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-violet-500/15 text-violet-400">
+            <GitBranch className="w-2.5 h-2.5" />
+          </div>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p className="text-xs font-medium text-gray-300 truncate">
+              {agent.name}{agent.subagent_type ? ` · ${agent.subagent_type}` : ""}
+            </p>
+          </div>
+          {showSubStatus && <AgentStatusBadge status={agent.status} />}
+          <span className="text-[10px] text-gray-600 flex-shrink-0 tabular-nums">
+            {agent.ended_at
+              ? formatDuration(agent.started_at, agent.ended_at)
+              : timeAgo(agent.updated_at || agent.started_at)}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   // Build ordered tag list: platform first, then token_name
   const tags: { key: string; node: React.ReactNode }[] = [];

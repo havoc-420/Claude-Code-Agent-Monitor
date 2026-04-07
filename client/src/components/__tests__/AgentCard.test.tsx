@@ -114,4 +114,56 @@ describe("AgentCard", () => {
     );
     expect(screen.getByText(/ran 5m 30s/)).toBeInTheDocument();
   });
+
+  describe("compact mode", () => {
+    it("should render compact layout when compact=true", () => {
+      const { container } = renderCard(
+        <AgentCard agent={makeAgent({ name: "Sub Agent" })} compact />,
+      );
+      // Compact mode should not have full padding
+      const card = container.querySelector(".card-hover");
+      expect(card?.className).toContain("p-2.5");
+    });
+
+    it("should show status badge in compact mode when showSubStatus=true", () => {
+      renderCard(
+        <AgentCard
+          agent={makeAgent({ status: "working" })}
+          compact
+          showSubStatus
+        />,
+      );
+      expect(screen.getByText("Working")).toBeInTheDocument();
+    });
+
+    it("should hide status badge in compact mode when showSubStatus=false", () => {
+      renderCard(
+        <AgentCard
+          agent={makeAgent({ status: "working" })}
+          compact
+        />,
+      );
+      expect(screen.queryByText("Working")).not.toBeInTheDocument();
+    });
+
+    it("should hide tags in compact mode", () => {
+      renderCard(
+        <AgentCard
+          agent={makeAgent({ platform: "claude" })}
+          compact
+        />,
+      );
+      expect(screen.queryByText("Claude")).not.toBeInTheDocument();
+    });
+
+    it("should render subagent name and type in compact mode", () => {
+      renderCard(
+        <AgentCard
+          agent={makeAgent({ name: "Explorer", subagent_type: "code-explorer" })}
+          compact
+        />,
+      );
+      expect(screen.getByText("Explorer · code-explorer")).toBeInTheDocument();
+    });
+  });
 });
