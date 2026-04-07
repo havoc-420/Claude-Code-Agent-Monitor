@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, GitBranch, Clock, Wrench, Tag, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
+import { Bot, GitBranch, Clock, Wrench, Tag, Sparkles, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AgentStatusBadge } from "./StatusBadge";
 import type { Agent } from "../lib/types";
