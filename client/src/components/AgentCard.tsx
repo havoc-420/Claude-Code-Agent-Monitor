@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, GitBranch, Clock, Wrench, Tag, Sparkles } from "lucide-react";
+import { Bot, GitBranch, Clock, Wrench, Tag, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AgentStatusBadge } from "./StatusBadge";
 import type { Agent } from "../lib/types";
@@ -16,9 +16,11 @@ interface AgentCardProps {
   hideStatus?: boolean;
   compact?: boolean;
   showSubStatus?: boolean;
+  groupExpanded?: boolean;
+  onGroupToggle?: () => void;
 }
 
-export function AgentCard({ agent, onClick, hideStatus = false, compact = false, showSubStatus = false }: AgentCardProps) {
+export function AgentCard({ agent, onClick, hideStatus = false, compact = false, showSubStatus = false, groupExpanded, onGroupToggle }: AgentCardProps) {
   const navigate = useNavigate();
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const isWorking = agent.status === "working" || agent.status === "connected" || agent.status === "awaiting_approval";
@@ -117,10 +119,31 @@ export function AgentCard({ agent, onClick, hideStatus = false, compact = false,
             )}
           </div>
           <div className="min-w-0 overflow-hidden">
-            <p className="text-sm font-medium text-gray-200 truncate">
-              {agent.session_cwd ? agent.session_cwd.split("/").pop() : agent.name}
-            </p>
-            <p className="text-[11px] text-gray-500 truncate">
+            <div className="flex items-center gap-1 min-w-0">
+              <p className="text-sm font-medium text-gray-200 truncate flex-1">
+                {agent.session_cwd ? agent.session_cwd.split("/").pop() : agent.name}
+              </p>
+              {onGroupToggle && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onGroupToggle();
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onGroupToggle();
+                  }}
+                  className={`flex-shrink-0 p-0.5 rounded hover:bg-surface-3 transition-colors ${
+                    groupExpanded ? "rotate-90" : ""
+                  }`}
+                  title={groupExpanded ? "Collapse" : "Expand"}
+                >
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500 truncate mt-0.5">
               {agent.name}{agent.subagent_type ? ` · ${agent.subagent_type}` : ""}
             </p>
           </div>

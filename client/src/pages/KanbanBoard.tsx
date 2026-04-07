@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { RefreshCw, Columns3, ChevronDown, ChevronRight } from "lucide-react";
+import { RefreshCw, Columns3, ChevronDown } from "lucide-react";
 import { api } from "../lib/api";
 import { eventBus } from "../lib/eventBus";
 import { AgentCard } from "../components/AgentCard";
@@ -195,27 +195,13 @@ export function KanbanBoard() {
 
                       return (
                         <div key={root.id}>
-                          {/* Group header row */}
-                          <div className="flex items-stretch gap-0">
-                            {hasChildren && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleGroup(root.id);
-                                }}
-                                className="flex items-center justify-center w-5 flex-shrink-0 text-gray-500 hover:text-gray-300 transition-colors mt-4"
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="w-3 h-3" />
-                                ) : (
-                                  <ChevronRight className="w-3 h-3" />
-                                )}
-                              </button>
-                            )}
-                            <div className={`flex-1 min-w-0 ${!hasChildren ? "" : ""}`}>
-                              <AgentCard agent={root} hideStatus />
-                            </div>
-                          </div>
+                          {/* Group header - expand/collapse is inside AgentCard name area */}
+                          <AgentCard
+                            agent={root}
+                            hideStatus
+                            groupExpanded={isExpanded}
+                            onGroupToggle={hasChildren ? () => toggleGroup(root.id) : undefined}
+                          />
 
                           {/* Collapsed hint */}
                           {hasChildren && !isExpanded && (
