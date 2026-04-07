@@ -4,11 +4,13 @@ import type { AgentStatus, SessionStatus } from "../lib/types";
 interface AgentStatusBadgeProps {
   status: AgentStatus;
   pulse?: boolean;
+  short?: boolean;
 }
 
-export function AgentStatusBadge({ status, pulse }: AgentStatusBadgeProps) {
+export function AgentStatusBadge({ status, pulse, short }: AgentStatusBadgeProps) {
   const config = STATUS_CONFIG[status];
   const shouldPulse = pulse ?? (status === "working" || status === "connected" || status === "awaiting_approval");
+  const label = short ? config.label.slice(0, 3) : config.label;
 
   return (
     <span className={`badge ${config.bg} ${config.color}`}>
@@ -17,7 +19,7 @@ export function AgentStatusBadge({ status, pulse }: AgentStatusBadgeProps) {
           shouldPulse ? "animate-pulse-dot" : ""
         }`}
       />
-      {config.label}
+      {label}
     </span>
   );
 }

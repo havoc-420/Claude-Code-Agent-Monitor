@@ -41,7 +41,7 @@ export function AgentCard({ agent, onClick, hideStatus = false, compact = false,
               {agent.name}{agent.subagent_type ? ` · ${agent.subagent_type}` : ""}
             </p>
           </div>
-          {showSubStatus && <AgentStatusBadge status={agent.status} />}
+          {showSubStatus && <AgentStatusBadge status={agent.status} short />}
           <span className="text-[10px] text-gray-600 flex-shrink-0 tabular-nums">
             {agent.ended_at
               ? formatDuration(agent.started_at, agent.ended_at)

@@ -205,7 +205,7 @@ export function KanbanBoard() {
 
                           {/* Collapsed hint */}
                           {hasChildren && !isExpanded && (
-                            <div className={`ml-5 mt-1 flex items-center gap-1.5 ${!hasChildren ? "" : ""}`}>
+                            <div className="ml-3 mt-1 flex items-center gap-1.5">
                               <span className="text-[11px] text-violet-400/80">
                                 {children.length} subagent{children.length !== 1 ? "s" : ""}
                               </span>
@@ -219,7 +219,7 @@ export function KanbanBoard() {
 
                           {/* Expanded children list */}
                           {hasChildren && isExpanded && (
-                            <div className="ml-5 mt-1 pl-3 border-l-2 border-violet-500/20 space-y-1.5 animate-fade-in">
+                            <div className="ml-3 mt-1 pl-2.5 border-l-2 border-violet-500/20 space-y-1.5 animate-fade-in">
                               {children.map((child) => (
                                 <div key={child.id} className="relative">
                                   <AgentCard agent={child} compact showSubStatus />
