@@ -120,7 +120,7 @@ export function AgentCard({ agent, onClick, hideStatus = false, compact = false,
           </div>
           <div className="min-w-0 overflow-hidden">
             <div className="flex items-center gap-1 min-w-0">
-              <p className="text-sm font-medium text-gray-200 truncate flex-1">
+              <p className="text-sm font-medium text-gray-200 flex-1 break-all leading-snug">
                 {agent.session_cwd ? agent.session_cwd.split("/").pop() : agent.name}
               </p>
               {onGroupToggle && (
