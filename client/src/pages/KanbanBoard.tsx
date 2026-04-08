@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { RefreshCw, Columns3, ChevronDown } from "lucide-react";
+import { RefreshCw, Columns3, ChevronDown, Ellipsis } from "lucide-react";
 import { api } from "../lib/api";
 import { eventBus } from "../lib/eventBus";
 import { AgentCard } from "../components/AgentCard";
@@ -20,6 +20,7 @@ export function KanbanBoard() {
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expandedCols, setExpandedCols] = useState<Record<string, number>>({});
+  const [showAllChildren, setShowAllChildren] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     try {
@@ -218,15 +219,33 @@ export function KanbanBoard() {
                           )}
 
                           {/* Expanded children list */}
-                          {hasChildren && isExpanded && (
-                            <div className="ml-3 mt-1 pl-2.5 border-l-2 border-violet-500/20 space-y-1.5 animate-fade-in">
-                              {children.map((child) => (
-                                <div key={child.id} className="relative">
-                                  <AgentCard agent={child} compact showSubStatus />
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          {hasChildren && isExpanded && (() => {
+                            const sorted = [...children].sort(
+                              (a, b) => new Date(b.updated_at || b.started_at).getTime() - new Date(a.updated_at || a.started_at).getTime(),
+                            );
+                            const isShowAll = showAllChildren[root.id] === true;
+                            const visible = isShowAll ? sorted : sorted.slice(0, 3);
+                            const remaining = sorted.length - visible.length;
+
+                            return (
+                              <div className="ml-3 mt-1 pl-2.5 border-l-2 border-violet-500/20 space-y-1.5 animate-fade-in">
+                                {visible.map((child) => (
+                                  <div key={child.id} className="relative">
+                                    <AgentCard agent={child} compact showSubStatus />
+                                  </div>
+                                ))}
+                                {remaining > 0 && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setShowAllChildren((p) => ({ ...p, [root.id]: true })); }}
+                                    className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-violet-400 transition-colors w-full py-1"
+                                  >
+                                    <Ellipsis className="w-3 h-3" />
+                                    <span>{remaining} more</span>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
