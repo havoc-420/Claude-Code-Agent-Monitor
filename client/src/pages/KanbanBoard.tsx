@@ -64,9 +64,12 @@ export function KanbanBoard() {
     for (const a of agents) {
       if (a.type === "main" || !a.parent_agent_id) {
         assigned.add(a.id);
+        const children = childrenMap.get(a.id) ?? [];
+        // Mark children as assigned so they don't appear as standalone cards
+        for (const c of children) assigned.add(c.id);
         groupsArr.push({
           root: a,
-          children: childrenMap.get(a.id) ?? [],
+          children,
         });
       }
     }
