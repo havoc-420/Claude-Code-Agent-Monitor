@@ -1,3 +1,5 @@
+> 原本在根目录。
+
 # Codex Agent Setup
 
 This directory contains project-scoped Codex extensions:

@@ -198,35 +198,48 @@ export function KanbanBoard() {
               key={status}
               className="bg-surface-1 rounded-xl border border-border p-3 flex flex-col flex-shrink-0 w-72 transition-all duration-300 ease-out animate-fade-in"
             >
-              <div className="flex items-center gap-2 mb-4 px-1">
-                <span
-                  className={`w-2 h-2 rounded-full ${config.dot} ${
-                    status === "working" || status === "awaiting_approval" ? "animate-pulse-dot" : ""
-                  }`}
-                />
-                <span className={`text-xs font-semibold uppercase tracking-wider ${config.color}`}>
-                  {config.label}
-                </span>
-                <span className="ml-auto text-[11px] text-gray-600 bg-surface-3 px-2 py-0.5 rounded-full">
-                  {count}
-                </span>
-                {count === 0 && pinnedEmptyCols[status] && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPinnedEmptyCols((p) => {
-                        const next = { ...p };
-                        delete next[status];
-                        return next;
-                      })
-                    }
-                    title="Collapse column"
-                    className="text-[10px] text-gray-600 hover:text-gray-300 transition-colors"
-                  >
-                    −
-                  </button>
-                )}
-              </div>
+              {(() => {
+                const isPinnedEmpty = count === 0 && pinnedEmptyCols[status];
+                const headerInner = (
+                  <>
+                    <span
+                      className={`w-2 h-2 rounded-full ${config.dot} ${
+                        status === "working" || status === "awaiting_approval" ? "animate-pulse-dot" : ""
+                      }`}
+                    />
+                    <span className={`text-xs font-semibold uppercase tracking-wider ${config.color}`}>
+                      {config.label}
+                    </span>
+                    <span className="ml-auto text-[11px] text-gray-600 bg-surface-3 px-2 py-0.5 rounded-full">
+                      {count}
+                    </span>
+                    {isPinnedEmpty && (
+                      <ChevronDown className="w-3 h-3 text-gray-600 rotate-180 transition-transform" />
+                    )}
+                  </>
+                );
+
+                if (isPinnedEmpty) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPinnedEmptyCols((p) => {
+                          const next = { ...p };
+                          delete next[status];
+                          return next;
+                        })
+                      }
+                      title="Collapse column"
+                      className="w-full flex items-center gap-2 mb-4 px-1 hover:opacity-80 transition-opacity cursor-pointer"
+                    >
+                      {headerInner}
+                    </button>
+                  );
+                }
+
+                return <div className="flex items-center gap-2 mb-4 px-1">{headerInner}</div>;
+              })()}
 
               <div className="flex-1 space-y-2.5 overflow-y-auto">
                 {visibleGroups.length > 0 ? (
@@ -287,15 +300,43 @@ export function KanbanBoard() {
                                     <AgentCard agent={child} compact showSubStatus />
                                   </div>
                                 ))}
-                                {remaining > 0 && (
+                                <div className="flex items-center gap-2 pt-0.5">
+                                  {remaining > 0 && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setShowAllChildren((p) => ({ ...p, [root.id]: true })); }}
+                                      className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-violet-400 transition-colors py-1"
+                                    >
+                                      <Ellipsis className="w-3 h-3" />
+                                      <span>{remaining} more</span>
+                                    </button>
+                                  )}
+                                  {isShowAll && remaining === 0 && sorted.length > 3 && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowAllChildren((p) => {
+                                          const next = { ...p };
+                                          delete next[root.id];
+                                          return next;
+                                        });
+                                      }}
+                                      className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-violet-400 transition-colors py-1"
+                                    >
+                                      <ChevronDown className="w-3 h-3 rotate-180" />
+                                      <span>Show less</span>
+                                    </button>
+                                  )}
+                                  {(remaining > 0 || (isShowAll && sorted.length > 3)) && (
+                                    <span className="text-[11px] text-gray-700 select-none">|</span>
+                                  )}
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); setShowAllChildren((p) => ({ ...p, [root.id]: true })); }}
-                                    className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-violet-400 transition-colors w-full py-1"
+                                    onClick={(e) => { e.stopPropagation(); toggleGroup(root.id); }}
+                                    className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-300 transition-colors py-1"
                                   >
-                                    <Ellipsis className="w-3 h-3" />
-                                    <span>{remaining} more</span>
+                                    <ChevronDown className="w-3 h-3 rotate-180" />
+                                    <span>Close</span>
                                   </button>
-                                )}
+                                </div>
                               </div>
                             );
                           })()}
