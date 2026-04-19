@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { STATUS_CONFIG } from "../lib/types";
 import type { Agent, AgentStatus } from "../lib/types";
 
-const COLUMNS: AgentStatus[] = ["awaiting_approval", "idle", "working", "connected", "error", "completed"];
+const COLUMNS: AgentStatus[] = ["awaiting_approval", "working", "idle", "connected", "error", "completed"];
 const COLUMN_PAGE_SIZE = 5;
 
 interface AgentGroup {
@@ -21,6 +21,7 @@ export function KanbanBoard() {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expandedCols, setExpandedCols] = useState<Record<string, number>>({});
   const [showAllChildren, setShowAllChildren] = useState<Record<string, boolean>>({});
+  const [pinnedEmptyCols, setPinnedEmptyCols] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     try {
@@ -166,11 +167,36 @@ export function KanbanBoard() {
           const visibleCount = expandedCols[status] || COLUMN_PAGE_SIZE;
           const visibleGroups = items?.slice(0, visibleCount) ?? [];
           const hasMore = (items?.length ?? 0) > visibleCount;
+          const count = items?.length ?? 0;
+          const isCollapsed = count === 0 && !pinnedEmptyCols[status];
+
+          if (isCollapsed) {
+            return (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setPinnedEmptyCols((p) => ({ ...p, [status]: true }))}
+                title={`${config.label} — 0 agents (click to expand)`}
+                className="group bg-surface-1/60 hover:bg-surface-1 rounded-xl border border-border/70 hover:border-border p-2 flex flex-col items-center flex-shrink-0 w-12 transition-all duration-300 ease-out overflow-hidden cursor-pointer"
+              >
+                <span className={`w-2 h-2 rounded-full ${config.dot} mt-1 mb-3 flex-shrink-0`} />
+                <span
+                  className={`text-[11px] font-semibold uppercase tracking-wider ${config.color} whitespace-nowrap`}
+                  style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                >
+                  {config.label}
+                </span>
+                <span className="mt-auto pt-3 text-[10px] text-gray-600 bg-surface-3 px-1.5 py-0.5 rounded-full">
+                  0
+                </span>
+              </button>
+            );
+          }
 
           return (
             <div
               key={status}
-              className="bg-surface-1 rounded-xl border border-border p-3 flex flex-col flex-shrink-0 w-72"
+              className="bg-surface-1 rounded-xl border border-border p-3 flex flex-col flex-shrink-0 w-72 transition-all duration-300 ease-out animate-fade-in"
             >
               <div className="flex items-center gap-2 mb-4 px-1">
                 <span
@@ -182,8 +208,24 @@ export function KanbanBoard() {
                   {config.label}
                 </span>
                 <span className="ml-auto text-[11px] text-gray-600 bg-surface-3 px-2 py-0.5 rounded-full">
-                  {items?.length ?? 0}
+                  {count}
                 </span>
+                {count === 0 && pinnedEmptyCols[status] && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPinnedEmptyCols((p) => {
+                        const next = { ...p };
+                        delete next[status];
+                        return next;
+                      })
+                    }
+                    title="Collapse column"
+                    className="text-[10px] text-gray-600 hover:text-gray-300 transition-colors"
+                  >
+                    −
+                  </button>
+                )}
               </div>
 
               <div className="flex-1 space-y-2.5 overflow-y-auto">
@@ -209,7 +251,15 @@ export function KanbanBoard() {
 
                           {/* Collapsed hint */}
                           {hasChildren && !isExpanded && (
-                            <div className="ml-3 mt-1 flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleGroup(root.id);
+                              }}
+                              className="ml-3 mt-1 flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer"
+                              title="Expand subagents"
+                            >
                               <span className="text-[11px] text-violet-400/80">
                                 {children.length} subagent{children.length !== 1 ? "s" : ""}
                               </span>
@@ -218,7 +268,7 @@ export function KanbanBoard() {
                                   ({activeChildren} active)
                                 </span>
                               )}
-                            </div>
+                            </button>
                           )}
 
                           {/* Expanded children list */}
