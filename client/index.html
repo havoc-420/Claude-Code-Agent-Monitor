@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
-    <meta name="theme-color" content="#6366f1" />
+    <meta name="theme-color" content="#10b981" />
     <title>Agent Dashboard - Claude Code Monitor</title>
     <meta
       name="description"
@@ -69,6 +69,64 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Theme bootstrap: applied synchronously before first paint to avoid
+         flashing the wrong palette (dark/light mode *and* accent color). -->
+    <script>
+      (function () {
+        // Must stay in sync with client/src/lib/accent.ts
+        var ACCENTS = {
+          emerald: {
+            dark: { base: "16 185 129", hover: "52 211 153", themeColor: "#10b981" },
+            light: { base: "5 150 105", hover: "4 120 87", themeColor: "#059669" },
+          },
+          teal: {
+            dark: { base: "20 184 166", hover: "45 212 191", themeColor: "#14b8a6" },
+            light: { base: "13 148 136", hover: "15 118 110", themeColor: "#0d9488" },
+          },
+          sky: {
+            dark: { base: "14 165 233", hover: "56 189 248", themeColor: "#0ea5e9" },
+            light: { base: "2 132 199", hover: "3 105 161", themeColor: "#0284c7" },
+          },
+          indigo: {
+            dark: { base: "99 102 241", hover: "129 140 248", themeColor: "#6366f1" },
+            light: { base: "79 70 229", hover: "67 56 202", themeColor: "#4f46e5" },
+          },
+          violet: {
+            dark: { base: "139 92 246", hover: "167 139 250", themeColor: "#8b5cf6" },
+            light: { base: "124 58 237", hover: "109 40 217", themeColor: "#7c3aed" },
+          },
+          rose: {
+            dark: { base: "244 63 94", hover: "251 113 133", themeColor: "#f43f5e" },
+            light: { base: "225 29 72", hover: "190 18 60", themeColor: "#e11d48" },
+          },
+          amber: {
+            dark: { base: "245 158 11", hover: "251 191 36", themeColor: "#f59e0b" },
+            light: { base: "217 119 6", hover: "180 83 9", themeColor: "#d97706" },
+          },
+        };
+
+        try {
+          var stored = localStorage.getItem("agent-monitor-theme");
+          var theme = stored === "light" ? "light" : "dark";
+          var accentId = localStorage.getItem("agent-monitor-accent") || "emerald";
+          var preset = ACCENTS[accentId] || ACCENTS.emerald;
+          var tone = theme === "light" ? preset.light : preset.dark;
+
+          var root = document.documentElement;
+          root.classList.add(theme);
+          root.style.colorScheme = theme;
+          root.style.setProperty("--accent", tone.base);
+          root.style.setProperty("--accent-hover", tone.hover);
+          root.style.setProperty("--selection-bg", tone.base);
+
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.content = tone.themeColor;
+        } catch (e) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
   </head>
   <body class="bg-surface-0 text-gray-200 antialiased">
     <div id="root"></div>

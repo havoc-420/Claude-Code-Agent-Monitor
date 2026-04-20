@@ -22,7 +22,7 @@ function patternIcon(steps: string[]): LucideIcon {
 
 function StepPill({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 whitespace-nowrap">
+    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 whitespace-nowrap">
       {label}
     </span>
   );
@@ -77,16 +77,16 @@ function PatternItem({ pattern, rank, isSelected, onClick }: PatternItemProps) {
       className={[
         "w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors duration-150",
         isSelected
-          ? "bg-indigo-500/10 border-indigo-500/30"
+          ? "bg-emerald-500/10 border-emerald-500/30"
           : "bg-surface-2 border-transparent hover:bg-white/5 hover:border-white/10",
       ].join(" ")}
     >
       {/* Rank / icon */}
-      <div className="flex-shrink-0 w-7 h-7 rounded-md bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+      <div className="flex-shrink-0 w-7 h-7 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
         {rank <= 3 ? (
-          <span className="text-xs font-bold text-indigo-400">{rank}</span>
+          <span className="text-xs font-bold text-emerald-400">{rank}</span>
         ) : (
-          <Icon className="w-3.5 h-3.5 text-indigo-400" />
+          <Icon className="w-3.5 h-3.5 text-emerald-400" />
         )}
       </div>
 

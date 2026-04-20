@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import {
   DollarSign,
   Plus,
@@ -41,6 +42,9 @@ import {
   MessageSquare,
   Key,
   Copy,
+  Palette,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { eventBus } from "../lib/eventBus";
@@ -48,6 +52,8 @@ import { fmt, fmtCost } from "../lib/format";
 import { Tip } from "../components/Tip";
 import type { ModelPricing, Platform, WSMessage } from "../lib/types";
 import { PLATFORM_CONFIG } from "../lib/types";
+import { useTheme } from "../hooks/useTheme";
+import { useAccent } from "../hooks/useAccent";
 
 // ─── Notification preferences ───
 
@@ -198,6 +204,27 @@ export function Settings() {
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>(loadNotifPrefs);
   const [abandonHours, setAbandonHours] = useState("24");
+
+  // Theme (dark/light) + accent color preset.
+  const { theme, setTheme } = useTheme();
+  const { accentId, setAccentId, presets: accentPresets } = useAccent();
+
+  // Scroll to the section referenced by `#hash` (used by the sidebar
+  // sub-nav links). We re-run when the hash changes and also once after
+  // the first load (because the DOM target may not exist yet while the
+  // initial data is loading).
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    const id = hash.replace(/^#/, "");
+    if (!id) return;
+    // Defer one frame so the target `<section>` is mounted after loading.
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [hash, loading]);
   const [purgeDays, setPurgeDays] = useState("90");
   const [pricingPage, setPricingPage] = useState(1);
   const PRICING_PAGE_SIZE = 5;
@@ -622,7 +649,9 @@ export function Settings() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-gray-100">Settings</h1>
-            <p className="text-xs text-gray-500">Manage pricing, notifications, data, and hooks</p>
+            <p className="text-xs text-gray-500">
+              Manage appearance, pricing, notifications, data, and hooks
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -639,6 +668,113 @@ export function Settings() {
           </button>
         </div>
       </div>
+
+      {/* ─── APPEARANCE ─── */}
+      <section id="appearance" className="scroll-mt-6">
+        <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
+          <Palette className="w-4 h-4 text-gray-500" />
+          Appearance
+        </h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Pick a color scheme and a brand accent. Your choice is saved locally in this browser.
+        </p>
+
+        <div className="card p-5 space-y-5">
+          {/* Mode toggle */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-200">Color scheme</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Dark mode is recommended for long monitoring sessions.
+              </p>
+            </div>
+            <div
+              role="radiogroup"
+              aria-label="Color scheme"
+              className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5"
+            >
+              {(["dark", "light"] as const).map((mode) => {
+                const active = theme === mode;
+                const Icon = mode === "dark" ? Moon : Sun;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setTheme(mode)}
+                    className={[
+                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                      active
+                        ? "bg-accent text-white shadow-sm"
+                        : "text-gray-400 hover:text-gray-200",
+                    ].join(" ")}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {mode === "dark" ? "Dark" : "Light"}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="h-px bg-border" />
+
+          {/* Accent swatches */}
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-200">Accent color</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Used for buttons, links, focus rings, and highlights.
+                </p>
+              </div>
+              <span className="text-[11px] uppercase tracking-wider text-gray-500">
+                Current:{" "}
+                <span className="text-gray-300 normal-case tracking-normal">
+                  {accentPresets.find((p) => p.id === accentId)?.label ?? accentId}
+                </span>
+              </span>
+            </div>
+            <div
+              role="radiogroup"
+              aria-label="Accent color"
+              className="flex flex-wrap gap-2"
+            >
+              {accentPresets.map((preset) => {
+                const active = preset.id === accentId;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setAccentId(preset.id)}
+                    title={preset.label}
+                    className={[
+                      "group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all",
+                      active
+                        ? "border-accent bg-accent/10 text-gray-100"
+                        : "border-border bg-surface-2 text-gray-400 hover:text-gray-200 hover:border-border-light",
+                    ].join(" ")}
+                  >
+                    <span
+                      className={[
+                        "w-3.5 h-3.5 rounded-full ring-2 ring-offset-2 ring-offset-surface-3 transition-shadow",
+                        active ? "ring-white/30" : "ring-transparent",
+                      ].join(" ")}
+                      style={{ backgroundColor: preset.swatch }}
+                      aria-hidden="true"
+                    />
+                    <span>{preset.label}</span>
+                    {active && <Check className="w-3 h-3 text-accent" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Cost summary card */}
       <div className="card p-6">
@@ -670,7 +806,7 @@ export function Settings() {
       </div>
 
       {/* ─── HOOK CONFIGURATION ─── */}
-      <section>
+      <section id="hooks" className="scroll-mt-6">
         <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
           <Plug className="w-4 h-4 text-gray-500" />
           Hook Configuration
@@ -732,7 +868,7 @@ export function Settings() {
       </section>
 
       {/* ─── API TOKENS ─── */}
-      <section>
+      <section id="api-tokens" className="scroll-mt-6">
         <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
           <Key className="w-4 h-4 text-gray-500" />
           API Tokens
@@ -901,7 +1037,7 @@ export function Settings() {
       </section>
 
       {/* ─── NOTIFICATIONS ─── */}
-      <section>
+      <section id="notifications" className="scroll-mt-6">
         <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
           <Bell className="w-4 h-4 text-gray-500" />
           Notifications
@@ -1062,7 +1198,7 @@ export function Settings() {
       </section>
 
       {/* ─── DATA MANAGEMENT ─── */}
-      <section>
+      <section id="data" className="scroll-mt-6">
         <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
           <Database className="w-4 h-4 text-gray-500" />
           Data Management
@@ -1125,9 +1261,9 @@ export function Settings() {
                     </div>
                   ));
                 })()}
-                <div className="bg-surface-2 rounded-lg px-3 py-3 border-l-2 border-indigo-500/20">
+                <div className="bg-surface-2 rounded-lg px-3 py-3 border-l-2 border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-1.5">
-                    <HardDrive className="w-4 h-4 text-indigo-400" />
+                    <HardDrive className="w-4 h-4 text-emerald-400" />
                     <p className="text-[11px] text-gray-500 uppercase tracking-wider">DB Size</p>
                   </div>
                   <p className="text-xl font-semibold text-gray-200">
@@ -1262,7 +1398,7 @@ export function Settings() {
       </section>
 
       {/* ─── MODEL PRICING ─── */}
-      <section>
+      <section id="pricing" className="scroll-mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2">
@@ -1377,7 +1513,7 @@ export function Settings() {
       </section>
 
       {/* ─── ABOUT ─── */}
-      <section>
+      <section id="about" className="scroll-mt-6">
         <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-1">
           <Server className="w-4 h-4 text-gray-500" />
           About

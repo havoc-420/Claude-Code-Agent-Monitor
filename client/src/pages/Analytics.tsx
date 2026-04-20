@@ -204,7 +204,7 @@ function Heatmap({ weeks }: { weeks: Array<Array<{ date: string; count: number }
 
 function Sparkline({
   data,
-  color = "#6366f1",
+  color = "#10b981",
 }: {
   data: Array<{ date: string; count: number }>;
   color?: string;
@@ -983,7 +983,7 @@ export function Analytics() {
                 <p className="text-sm text-gray-500">No session trend data yet.</p>
               ) : (
                 <>
-                  <Sparkline data={dailySessionsLocal.slice(-30)} color="#6366f1" />
+                  <Sparkline data={dailySessionsLocal.slice(-30)} color="#10b981" />
                   <div className="mt-4 space-y-2">
                     {dailySessionsLocal
                       .slice(-7)

@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Columns3,
@@ -12,18 +12,90 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
+  ChevronRight,
+  Palette,
+  Plug,
+  Key,
+  Bell,
+  Database,
+  DollarSign,
+  Server,
+  Share2,
+  GitBranch,
+  Gauge,
+  Layers,
+  AlertCircle,
+  Clock,
+  Boxes,
+  Minimize2,
+  Search,
+  Network,
+  Wrench,
+  type LucideIcon,
 } from "lucide-react";
+import { useMemo } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
+import { ThemeToggle } from "./ThemeToggle";
 
-const NAV_ITEMS = [
+interface NavChild {
+  /** Hash portion only, without the leading `#`. */
+  hash: string;
+  icon: LucideIcon;
+  label: string;
+}
+
+interface NavItem {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  children?: NavChild[];
+}
+
+/**
+ * Primary sidebar navigation. Items may declare `children`, which render as
+ * an indented sub-list that jumps to `#<hash>` anchors on the target page.
+ * Keep child hashes in sync with the matching `<section id="...">` in the
+ * target page (see e.g. `pages/Settings.tsx`).
+ */
+const NAV_ITEMS: readonly NavItem[] = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/kanban", icon: Columns3, label: "Agent Board" },
   { to: "/sessions", icon: FolderOpen, label: "Sessions" },
   { to: "/activity", icon: Activity, label: "Activity Feed" },
   { to: "/analytics", icon: BarChart3, label: "Analytics" },
-  { to: "/workflows", icon: Workflow, label: "Workflows" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+  {
+    to: "/workflows",
+    icon: Workflow,
+    label: "Workflows",
+    children: [
+      { hash: "orchestration", icon: Share2, label: "Orchestration" },
+      { hash: "tool-flow", icon: Wrench, label: "Tool Flow" },
+      { hash: "pipeline", icon: GitBranch, label: "Pipeline" },
+      { hash: "effectiveness", icon: Gauge, label: "Effectiveness" },
+      { hash: "patterns", icon: Layers, label: "Patterns" },
+      { hash: "delegation", icon: Network, label: "Delegation" },
+      { hash: "errors", icon: AlertCircle, label: "Errors" },
+      { hash: "concurrency", icon: Clock, label: "Concurrency" },
+      { hash: "complexity", icon: Boxes, label: "Complexity" },
+      { hash: "compaction", icon: Minimize2, label: "Compaction" },
+      { hash: "drill-in", icon: Search, label: "Drill-In" },
+    ],
+  },
+  {
+    to: "/settings",
+    icon: Settings,
+    label: "Settings",
+    children: [
+      { hash: "appearance", icon: Palette, label: "Appearance" },
+      { hash: "hooks", icon: Plug, label: "Hooks" },
+      { hash: "api-tokens", icon: Key, label: "API Tokens" },
+      { hash: "notifications", icon: Bell, label: "Notifications" },
+      { hash: "data", icon: Database, label: "Data" },
+      { hash: "pricing", icon: DollarSign, label: "Model Pricing" },
+      { hash: "about", icon: Server, label: "About" },
+    ],
+  },
 ] as const;
 
 const STORAGE_KEY = "sidebar-collapsed";
@@ -45,6 +117,9 @@ interface SidebarProps {
 export function Sidebar({ wsConnected, collapsed, onToggle }: SidebarProps) {
   const navigate = useNavigate();
   const { authEnabled } = useAuth();
+  const { pathname, hash } = useLocation();
+
+  const activeHash = useMemo(() => hash.replace(/^#/, ""), [hash]);
 
   const handleLogout = async () => {
     try {
@@ -78,26 +153,80 @@ export function Sidebar({ wsConnected, collapsed, onToggle }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-1">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === "/"}
-            title={collapsed ? label : undefined}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg text-sm font-medium transition-colors duration-150 ${
-                collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5"
-              } ${
-                isActive
-                  ? "bg-accent/10 text-accent border border-accent/20"
-                  : "text-gray-400 hover:text-gray-200 hover:bg-surface-3 border border-transparent"
-              }`
-            }
-          >
-            <Icon className="w-4 h-4 flex-shrink-0" />
-            {!collapsed && <span>{label}</span>}
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const { to, icon: Icon, label, children } = item;
+          const isOwnerActive =
+            pathname === to || (to !== "/" && pathname.startsWith(to + "/"));
+          // Accordion behavior: the sub-nav is open iff the user is currently
+          // on the owning route. Navigating away auto-collapses it.
+          const isOpen = !collapsed && !!children && isOwnerActive;
+
+          return (
+            <div key={to}>
+              <NavLink
+                to={to}
+                end={to === "/"}
+                title={collapsed ? label : undefined}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-lg text-sm font-medium transition-colors duration-150 ${
+                    collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5"
+                  } ${
+                    isActive
+                      ? "bg-accent/10 text-accent border border-accent/20"
+                      : "text-gray-400 hover:text-gray-200 hover:bg-surface-3 border border-transparent"
+                  }`
+                }
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {!collapsed && (
+                  <>
+                    <span className="flex-1 truncate">{label}</span>
+                    {children && (
+                      <ChevronRight
+                        className={`w-3.5 h-3.5 flex-shrink-0 opacity-60 transition-transform duration-200 ${
+                          isOpen ? "rotate-90" : ""
+                        }`}
+                      />
+                    )}
+                  </>
+                )}
+              </NavLink>
+
+              {/* Sub-nav (only when expanded & sidebar is open) */}
+              {isOpen && children && (
+                <ul className="mt-1 mb-1 ml-5 pl-3 border-l border-border space-y-0.5">
+                  {children.map((child) => {
+                    const active = isOwnerActive && activeHash === child.hash;
+                    const ChildIcon = child.icon;
+                    return (
+                      <li key={child.hash}>
+                        <NavLink
+                          to={`${to}#${child.hash}`}
+                          onClick={() => {
+                            // Re-scroll if the user clicks the already-active
+                            // sub-item (hash unchanged → effect wouldn't fire).
+                            if (isOwnerActive && activeHash === child.hash) {
+                              const el = document.getElementById(child.hash);
+                              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                          }}
+                          className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors ${
+                            active
+                              ? "text-accent bg-accent/10"
+                              : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                          }`}
+                        >
+                          <ChildIcon className="w-3 h-3 flex-shrink-0 opacity-80" />
+                          <span className="truncate">{child.label}</span>
+                        </NavLink>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       {/* Collapse toggle */}
@@ -118,6 +247,7 @@ export function Sidebar({ wsConnected, collapsed, onToggle }: SidebarProps) {
             )}
           </button>
         )}
+        <ThemeToggle collapsed={collapsed} />
         <button
           onClick={onToggle}
           className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-gray-300 hover:bg-surface-3 transition-colors"

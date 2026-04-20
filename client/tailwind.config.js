@@ -1,25 +1,31 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  // Manual class-based strategy so we can drive light/dark from a
+  // `light` / `dark` class on <html>.
+  darkMode: "class",
   theme: {
     extend: {
+      // Surface / border / accent are driven by CSS custom properties
+      // defined in `src/index.css`. Each var holds an `R G B` triplet so
+      // Tailwind's alpha modifiers (e.g. `bg-accent/20`) keep working.
       colors: {
         surface: {
-          0: "#06060a",
-          1: "#0c0c14",
-          2: "#13131e",
-          3: "#1a1a28",
-          4: "#222233",
-          5: "#2a2a3d",
+          0: "rgb(var(--surface-0) / <alpha-value>)",
+          1: "rgb(var(--surface-1) / <alpha-value>)",
+          2: "rgb(var(--surface-2) / <alpha-value>)",
+          3: "rgb(var(--surface-3) / <alpha-value>)",
+          4: "rgb(var(--surface-4) / <alpha-value>)",
+          5: "rgb(var(--surface-5) / <alpha-value>)",
         },
         border: {
-          DEFAULT: "#2a2a3d",
-          light: "#363650",
+          DEFAULT: "rgb(var(--border) / <alpha-value>)",
+          light: "rgb(var(--border-light) / <alpha-value>)",
         },
         accent: {
-          DEFAULT: "#6366f1",
-          hover: "#818cf8",
-          muted: "rgba(99, 102, 241, 0.15)",
+          DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          hover: "rgb(var(--accent-hover) / <alpha-value>)",
+          muted: "rgb(var(--accent) / 0.15)",
         },
       },
       fontFamily: {

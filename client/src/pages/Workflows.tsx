@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Workflow, RefreshCw, Download, AlertCircle, Info } from "lucide-react";
 import { api } from "../lib/api";
 import { eventBus } from "../lib/eventBus";
@@ -75,6 +76,20 @@ export function Workflows() {
     URL.revokeObjectURL(url);
   };
 
+  // Scroll to the section referenced by `#hash` (used by the sidebar
+  // sub-nav links). Re-runs on hash change and once data finishes loading.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    const id = hash.replace(/^#/, "");
+    if (!id) return;
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [hash, loading]);
+
   if (loading && !data) {
     return (
       <div className="space-y-6">
@@ -136,6 +151,7 @@ export function Workflows() {
 
       {/* Section 1: Agent Orchestration DAG */}
       <Section
+        id="orchestration"
         number={1}
         title="Agent Orchestration Graph"
         subtitle="Aggregate spawning patterns across all sessions — Click a node to filter"
@@ -163,6 +179,7 @@ export function Workflows() {
 
       {/* Section 2: Tool Execution Flow */}
       <Section
+        id="tool-flow"
         number={2}
         title="Tool Execution Flow"
         subtitle="How tools chain together — Sankey-style directed flow"
@@ -172,6 +189,7 @@ export function Workflows() {
 
       {/* Section 3: Agent Collaboration Network */}
       <Section
+        id="pipeline"
         number={3}
         title="Agent Pipeline Graph"
         subtitle="Directed workflow — which agent types run after which, with frequency labels"
@@ -182,6 +200,7 @@ export function Workflows() {
       {/* Section 4 + 5: Two Column */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Section
+          id="effectiveness"
           number={4}
           title="Subagent Effectiveness"
           subtitle="Performance metrics per agent type"
@@ -190,6 +209,7 @@ export function Workflows() {
         </Section>
 
         <Section
+          id="patterns"
           number={5}
           title="Detected Workflow Patterns"
           subtitle="Common agent orchestration sequences"
@@ -201,6 +221,7 @@ export function Workflows() {
       {/* Section 6 + 7: Two Column */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Section
+          id="delegation"
           number={6}
           title="Model Delegation Flow"
           subtitle="How models route through agent hierarchies"
@@ -209,6 +230,7 @@ export function Workflows() {
         </Section>
 
         <Section
+          id="errors"
           number={7}
           title="Error Propagation Map"
           subtitle="Where errors cluster in agent hierarchy depth"
@@ -219,6 +241,7 @@ export function Workflows() {
 
       {/* Section 8: Agent Concurrency Timeline */}
       <Section
+        id="concurrency"
         number={8}
         title="Agent Concurrency Timeline"
         subtitle="Parallel agent execution patterns — Shows how agents overlap in time"
@@ -229,6 +252,7 @@ export function Workflows() {
       {/* Section 9 + 10: Two Column */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Section
+          id="complexity"
           number={9}
           title="Session Complexity Scatter"
           subtitle="Duration vs agent count vs tokens — Bubble size = token usage"
@@ -237,6 +261,7 @@ export function Workflows() {
         </Section>
 
         <Section
+          id="compaction"
           number={10}
           title="Compaction Impact Analysis"
           subtitle="Context compression events and token recovery"
@@ -247,6 +272,7 @@ export function Workflows() {
 
       {/* Section 11: Session Drill-In */}
       <Section
+        id="drill-in"
         number={11}
         title="Session Drill-In"
         subtitle="Select a session from the scatter plot or use the dropdown to explore"
@@ -263,11 +289,13 @@ export function Workflows() {
 
 // ── Section wrapper ──
 function Section({
+  id,
   number,
   title,
   subtitle,
   children,
 }: {
+  id?: string;
   number: number;
   title: string;
   subtitle: string;
@@ -276,7 +304,7 @@ function Section({
   const [showTip, setShowTip] = useState(false);
 
   return (
-    <div>
+    <div id={id} className={id ? "scroll-mt-6" : undefined}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
           <span className="w-5 h-5 rounded-md bg-accent/15 text-accent text-[11px] font-bold flex items-center justify-center">

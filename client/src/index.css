@@ -2,10 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ───────────────────────────────────────────────────────────────
+   Theme tokens
+   Values are `R G B` triplets so Tailwind can apply alpha modifiers
+   via `rgb(var(--x) / <alpha-value>)` in tailwind.config.js.
+   ─────────────────────────────────────────────────────────────── */
 @layer base {
+  :root,
+  .dark {
+    /* surfaces (deepest → lightest elevation) */
+    --surface-0: 6 6 10;      /* #06060a */
+    --surface-1: 12 12 20;    /* #0c0c14 */
+    --surface-2: 19 19 30;    /* #13131e */
+    --surface-3: 26 26 40;    /* #1a1a28 */
+    --surface-4: 34 34 51;    /* #222233 */
+    --surface-5: 42 42 61;    /* #2a2a3d */
+
+    --border: 42 42 61;       /* #2a2a3d */
+    --border-light: 54 54 80; /* #363650 */
+
+    /* Accent — emerald family, easy on the eyes on dark bg. */
+    --accent: 16 185 129;        /* #10b981 emerald-500 */
+    --accent-hover: 52 211 153;  /* #34d399 emerald-400 */
+
+    /* Used by custom CSS below (scrollbar, selection, …). */
+    --scrollbar-track: 12 12 20;
+    --scrollbar-thumb: 42 42 61;
+    --scrollbar-thumb-hover: 54 54 80;
+    --selection-bg: 16 185 129;
+    --selection-fg: 228 228 237;
+  }
+
+  .light {
+    /* Light palette: white → near-white greys for elevation.
+       Kept cool-neutral so the indigo accent still reads nicely. */
+    --surface-0: 246 247 251;  /* page background */
+    --surface-1: 255 255 255;  /* sidebar / top surfaces */
+    --surface-2: 248 249 252;  /* subtle well */
+    --surface-3: 255 255 255;  /* cards */
+    --surface-4: 241 243 248;  /* hover / raised */
+    --surface-5: 230 233 240;  /* pressed / raised+ */
+
+    --border: 226 229 236;        /* #e2e5ec */
+    --border-light: 203 209 220;  /* #cbd1dc */
+
+    /* Emerald accent, slightly deeper so it carries contrast on white. */
+    --accent: 5 150 105;          /* #059669 emerald-600 */
+    --accent-hover: 4 120 87;     /* #047857 emerald-700 */
+
+    --scrollbar-track: 241 243 248;
+    --scrollbar-thumb: 203 209 220;
+    --scrollbar-thumb-hover: 160 168 184;
+    --selection-bg: 16 185 129;
+    --selection-fg: 17 24 39;
+  }
+
+  /* Scrollbars, selection — themed through the vars above. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #2a2a3d #0c0c14;
+    scrollbar-color: rgb(var(--scrollbar-thumb)) rgb(var(--scrollbar-track));
   }
 
   *::-webkit-scrollbar {
@@ -14,21 +69,29 @@
   }
 
   *::-webkit-scrollbar-track {
-    background: #0c0c14;
+    background: rgb(var(--scrollbar-track));
   }
 
   *::-webkit-scrollbar-thumb {
-    background: #2a2a3d;
+    background: rgb(var(--scrollbar-thumb));
     border-radius: 3px;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: #363650;
+    background: rgb(var(--scrollbar-thumb-hover));
   }
 
   ::selection {
-    background: rgba(99, 102, 241, 0.3);
-    color: #e4e4ed;
+    background: rgb(var(--selection-bg) / 0.3);
+    color: rgb(var(--selection-fg));
+  }
+
+  /* Smooth transitions when toggling themes. Exclude transforms so we
+     don't accidentally animate layout changes (sidebar collapse, etc). */
+  body {
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
   }
 }
 
@@ -55,6 +118,53 @@
 
   .input {
     @apply bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-colors;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────
+   Light-mode remapping for Tailwind's built-in gray utilities.
+
+   Components throughout the app were authored for dark mode using
+   `text-gray-100…600` / `text-white`. On a white background those
+   light shades disappear. We remap them in `.light` to a readable
+   dark-on-light gradient, so no component code has to change.
+
+   Order is important: we remap from "lightest" (used for titles)
+   down to "darkest" (used for faint hints) so hover-states that
+   swap `text-gray-400 → text-gray-200` still produce a visible
+   tone shift (darker = more prominent in light mode).
+   ─────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .light .text-white {
+    color: rgb(17 24 39); /* slate-900 */
+  }
+  .light .text-gray-100 {
+    color: rgb(17 24 39); /* primary text */
+  }
+  .light .text-gray-200 {
+    color: rgb(31 41 55); /* slate-800 — hover emphasis */
+  }
+  .light .text-gray-300 {
+    color: rgb(55 65 81); /* slate-700 — body */
+  }
+  .light .text-gray-400 {
+    color: rgb(75 85 99); /* slate-600 — secondary */
+  }
+  .light .text-gray-500 {
+    color: rgb(107 114 128); /* slate-500 — muted */
+  }
+  .light .text-gray-600 {
+    color: rgb(148 163 184); /* slate-400 — faint */
+  }
+  .light .placeholder-gray-500::placeholder {
+    color: rgb(148 163 184);
+  }
+
+  /* A handful of pages use `bg-white` for chart tooltips / popovers.
+     In light mode a literal white would vanish on white cards, so we
+     nudge it to the topmost surface tone. */
+  .light .bg-white {
+    background-color: rgb(var(--surface-1));
   }
 }
 

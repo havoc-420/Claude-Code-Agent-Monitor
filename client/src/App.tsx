@@ -14,6 +14,7 @@ import { NotFound } from "./pages/NotFound";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useNotifications } from "./hooks/useNotifications";
 import { useAuth } from "./hooks/useAuth";
+import { useAccent } from "./hooks/useAccent";
 import { eventBus } from "./lib/eventBus";
 import type { WSMessage } from "./lib/types";
 
@@ -42,6 +43,8 @@ export default function App() {
 
   const { connected } = useWebSocket(onMessage);
   useNotifications();
+  // Keeps the accent color CSS variables in sync with the user's selection.
+  useAccent();
 
   return (
     <BrowserRouter>

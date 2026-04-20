@@ -115,7 +115,7 @@ function TreeNode({ node, depth }: TreeNodeProps) {
 
         {/* Name */}
         <span
-          className={`text-sm font-medium truncate ${isMain ? "text-indigo-300" : "text-gray-200"}`}
+          className={`text-sm font-medium truncate ${isMain ? "text-emerald-300" : "text-gray-200"}`}
         >
           {node.name}
         </span>
@@ -185,7 +185,7 @@ function ToolTimeline({ events }: ToolTimelineProps) {
             className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 transition-colors"
           >
             {/* Tool pill */}
-            <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 whitespace-nowrap">
+            <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 whitespace-nowrap">
               {ev.tool_name ?? ev.event_type}
             </span>
 
@@ -468,7 +468,7 @@ function SessionSelector({ onSelectSession }: SessionSelectorProps) {
       <div
         className={[
           "flex items-center gap-2 px-3 py-2 rounded-lg border bg-surface-3 transition-colors cursor-text",
-          open ? "border-indigo-500/40 ring-1 ring-indigo-500/20" : "border-border",
+          open ? "border-emerald-500/40 ring-1 ring-emerald-500/20" : "border-border",
         ].join(" ")}
         onClick={() => {
           setOpen(true);
